@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Entity
 @Data @AllArgsConstructor @NoArgsConstructor
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -29,10 +31,16 @@ public class Projet implements Cloneable {
     private String prestataire;
     private String bordereau;
     private String financement;
-    @OneToOne
+    @OneToOne(cascade = CascadeType.REMOVE)
     private Suivi suivi;
     @ManyToOne @JsonIgnore
     private Programme programme;
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "projet",cascade = CascadeType.REMOVE)
+    private List<Payement> payement;
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "projet",cascade = CascadeType.REMOVE)
+    private List<SuiviTravaux> suiviTravaux;
 
     public Object clone() throws CloneNotSupportedException{
         return super.clone();

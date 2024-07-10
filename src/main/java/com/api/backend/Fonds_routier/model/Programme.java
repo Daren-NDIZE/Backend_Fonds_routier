@@ -1,5 +1,6 @@
 package com.api.backend.Fonds_routier.model;
 
+import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -31,12 +32,14 @@ public class Programme implements Cloneable {
 
     @Enumerated(EnumType.STRING) @NotNull
     private ProgrammeStatut statut;
-    @NotNull
-    private String ordonnateur;
+
+    @Enumerated(EnumType.STRING) @NotNull
+    private Ordonnateur ordonnateur;
+
     @Column(columnDefinition = "LONGTEXT")
     private String observation;
     private String url_resolution;
-    @OneToMany(fetch = FetchType.LAZY,mappedBy = "programme")
+    @OneToMany(fetch = FetchType.LAZY,mappedBy = "programme",cascade = CascadeType.REMOVE)
     private List<Projet> projetList;
 
 

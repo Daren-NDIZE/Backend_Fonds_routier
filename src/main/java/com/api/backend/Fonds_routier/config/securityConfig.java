@@ -1,11 +1,14 @@
 package com.api.backend.Fonds_routier.config;
 
+import com.api.backend.Fonds_routier.enums.UserRole;
+import com.api.backend.Fonds_routier.model.Utilisateur;
+import com.api.backend.Fonds_routier.repository.UtilisateurRepository;
+import com.api.backend.Fonds_routier.service.AccountService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -23,7 +26,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
-import java.util.List;
 
 
 @Configuration
@@ -48,7 +50,6 @@ public class securityConfig  {
                 .build();
     }
 
-
     @Bean
     JwtEncoder jwtEncoder(){
 
@@ -66,9 +67,6 @@ public class securityConfig  {
         return NimbusJwtDecoder.withSecretKey(secretKeySpec).macAlgorithm(MacAlgorithm.HS512).build();
     }
 
-
-
-    
     @Bean
     CorsConfigurationSource corsConfigurationSource(){
         CorsConfiguration corsConfiguration =new CorsConfiguration();
@@ -80,5 +78,19 @@ public class securityConfig  {
         source.registerCorsConfiguration("/**",corsConfiguration);
 
         return source;
+    }
+
+    @Bean
+    CommandLineRunner initDatabase(AccountService accountService) {
+
+        return args->{
+
+            Utilisateur utilisateur=accountService.getUserByRole(UserRole.ADMIN);
+            if(utilisateur==null){
+
+                accountService.saveUser(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",0,"admin@gmail.com",UserRole.ADMIN,"fonds*2024"));
+                System.out.println("data initialized");
+            }
+        };
     }
 }

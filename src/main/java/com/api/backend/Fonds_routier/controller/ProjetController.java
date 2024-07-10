@@ -2,8 +2,10 @@ package com.api.backend.Fonds_routier.controller;
 
 import com.api.backend.Fonds_routier.DTO.MessageDTO;
 import com.api.backend.Fonds_routier.DTO.SuiviDTO;
+import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.model.*;
+import com.api.backend.Fonds_routier.service.PayementService;
 import com.api.backend.Fonds_routier.service.ProgrammeService;
 import com.api.backend.Fonds_routier.service.ProjetService;
 import org.apache.commons.io.FilenameUtils;
@@ -30,6 +32,8 @@ public class ProjetController {
     ProjetService projetService;
     @Autowired
     ProgrammeService programmeService;
+    @Autowired
+    PayementService payementService;
     @Autowired
     JwtDecoder jwtDecoder;
 
@@ -190,7 +194,7 @@ public class ProjetController {
 
         Programme programme=projet.getProgramme();
 
-        if( !(programme.getOrdonnateur().equals(jwt.getClaim("role"))) ){
+        if( !(programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role")))) ){
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
         if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
@@ -201,6 +205,17 @@ public class ProjetController {
         projetService.deleteProjet(id);
         return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
 
+    }
+
+    @GetMapping("/projet/{id}")
+    public ResponseEntity getProjetById(@PathVariable(value = "id") long id){
+
+        Projet projet=projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+
+        return ResponseEntity.ok(projet);
     }
 
     @PostMapping("/suiviProjet/{id}")
@@ -214,6 +229,10 @@ public class ProjetController {
         Programme programme=projet.getProgramme();
         if(programme.getStatut()!= ProgrammeStatut.VALIDER ){
             return ResponseEntity.ok(new MessageDTO("erreur","Impossible, programme en cours de traitement"));
+        }
+        if(suiviDTO.getStatut().equals("Visé") && (projet.getSuivi()==null || projet.getSuivi().getEngagement()==0) ){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible,car le projet n'a pas été engagé"));
         }
 
         if(suiviDTO.getFile()!=null){
@@ -277,5 +296,44 @@ public class ProjetController {
         return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
     }
 
+    @PostMapping("/projet/savePayement/{id}")
+    public  ResponseEntity<MessageDTO> savePayement(@PathVariable(value = "id") long id, @RequestBody Payement payement){
 
+        Projet projet =projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+        if(projet.getBordereau()==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car le projet n'est pas validé"));
+        }
+        if(payement.getM_HTVA()<=0 || payement.getDecompte()==null || ( payement.getAir()!=5.5 && payement.getAir()!=2.2 ) ){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement les champs"));
+        }
+
+        payementService.savePayement(projet,payement);
+        return ResponseEntity.ok(new MessageDTO("succes","payement enregistré avec succès"));
+
+    }
+
+    @PostMapping("/projet/saveSuiviTravaux/{id}")
+    public ResponseEntity<MessageDTO> saveSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux suiviTravaux){
+
+        Projet projet =projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+        if(projet.getBordereau()==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car le projet n'est pas validé"));
+        }
+        if( suiviTravaux.getDescription()==null || suiviTravaux.getTauxAvancement()<=0 || suiviTravaux.getTauxConsommation()<=0){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+
+        projetService.saveSuiviTravaux(projet,suiviTravaux);
+
+        return ResponseEntity.ok(new MessageDTO("succes","suivi des travaux enregistré avec succès"));
+
+    }
 }

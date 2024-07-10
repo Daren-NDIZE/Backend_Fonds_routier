@@ -1,6 +1,9 @@
 package com.api.backend.Fonds_routier.controller;
 import com.api.backend.Fonds_routier.DTO.DecisionDTO;
 import com.api.backend.Fonds_routier.DTO.MessageDTO;
+import com.api.backend.Fonds_routier.DTO.ProgrammeFilterDTO;
+import com.api.backend.Fonds_routier.DTO.SyntheseDTO;
+import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.Programme;
@@ -22,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -31,7 +35,6 @@ public class ProgrammeController {
     ProgrammeService programmeService;
     @Autowired
     JwtDecoder jwtDecoder;
-
 
 
     @PostMapping("/saveProgramme")
@@ -52,7 +55,7 @@ public class ProgrammeController {
         }
 
         programme.setStatut(ProgrammeStatut.EN_ATTENTE_DE_SOUMISSION);
-        programme.setOrdonnateur(jwt.getClaim("role"));
+        programme.setOrdonnateur(Ordonnateur.valueOf(jwt.getClaim("role")));
 
         if(programme.getType()==ProgrammeType.BASE){
             programme.setIntitule("Programme "+jwt.getClaim("role")+" "+programme.getAnnee());
@@ -77,7 +80,7 @@ public class ProgrammeController {
     public List<Programme>  getProgrammeByRole(@RequestHeader("Authorization") String token){
 
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List<Programme> list=programmeService.getProgrammeByOrdonnateur(jwt.getClaim("role"));
+        List<Programme> list=programmeService.getProgrammeByOrdonnateur(Ordonnateur.valueOf(jwt.getClaim("role")));
 
         return list;
     }
@@ -94,6 +97,17 @@ public class ProgrammeController {
         return programmeService.getProgrammeByStatut(ProgrammeStatut.VALIDER);
     }
 
+    @GetMapping("/getCloseProgramme")
+    public List<Programme>  getCloseProgramme(){
+
+        return programmeService.getProgrammeByStatut(ProgrammeStatut.CLOTURER);
+    }
+
+    @GetMapping("/getValidAndCloseProgramme")
+    public List<Programme>  getValidAndCloseProgramme(){
+
+        return programmeService.getProgrammeByStatuts(List.of(ProgrammeStatut.VALIDER,ProgrammeStatut.CLOTURER));
+    }
 
     @DeleteMapping("/deleteProgramme/{id}")
     public ResponseEntity<MessageDTO> deleteProgramme(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token){
@@ -104,7 +118,7 @@ public class ProgrammeController {
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
-        if(!programme.getOrdonnateur().equals(jwt.getClaim("role"))){
+        if( !programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role"))) ){
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
@@ -128,7 +142,7 @@ public class ProgrammeController {
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
-        if(!programme.getOrdonnateur().equals(jwt.getClaim("role"))){
+        if( !programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role"))) ){
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
@@ -167,7 +181,7 @@ public class ProgrammeController {
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
-        if(!programme.getOrdonnateur().equals(jwt.getClaim("role"))){
+        if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role")))){
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
@@ -186,7 +200,7 @@ public class ProgrammeController {
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
-        if(!programme.getOrdonnateur().equals(jwt.getClaim("role"))){
+        if( !programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role"))) ){
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
@@ -211,7 +225,7 @@ public class ProgrammeController {
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
-        if(!programme.getOrdonnateur().equals(jwt.getClaim("role"))){
+        if( !programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role"))) ){
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
@@ -236,7 +250,7 @@ public class ProgrammeController {
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
-        if(!programme.getOrdonnateur().equals(jwt.getClaim("role"))){
+        if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role")))){
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
@@ -308,6 +322,16 @@ public class ProgrammeController {
         header.setContentLength(pdf.length);
 
         return new ResponseEntity(pdf,header,HttpStatus.OK);
+    }
+
+    @PostMapping("/programme/syntheseProgramme")
+    public ResponseEntity getFinalProgramme(@RequestBody ProgrammeFilterDTO filter){
+
+        List<Programme> list= programmeService.getSyntheseProgramme(filter);
+
+        SyntheseDTO syntheseDTO=programmeService.syntheseProgramme(list, filter.getOrdonnateur());
+
+        return ResponseEntity.ok(syntheseDTO);
     }
 }
 

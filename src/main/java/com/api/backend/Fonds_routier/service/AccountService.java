@@ -46,7 +46,7 @@ public class AccountService {
     }
 
 
-    public void savaUser(Utilisateur utilisateur){
+    public void saveUser(Utilisateur utilisateur){
 
         utilisateurRepository.save(utilisateur);
     }
@@ -54,6 +54,11 @@ public class AccountService {
     public List<Utilisateur> getAllUser(long id){
 
         return utilisateurRepository.findByIdIsNot(id);
+    }
+
+    public Utilisateur getUserByRole(UserRole role){
+
+        return utilisateurRepository.findByRole(role);
     }
 
     public String generateToken(Utilisateur utilisateur){

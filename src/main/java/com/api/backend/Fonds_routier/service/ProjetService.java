@@ -4,12 +4,15 @@ import com.api.backend.Fonds_routier.DTO.SuiviDTO;
 import com.api.backend.Fonds_routier.model.Programme;
 import com.api.backend.Fonds_routier.model.Projet;
 import com.api.backend.Fonds_routier.model.Suivi;
+import com.api.backend.Fonds_routier.model.SuiviTravaux;
 import com.api.backend.Fonds_routier.repository.ProjetRepository;
 import com.api.backend.Fonds_routier.repository.SuiviRepository;
+import com.api.backend.Fonds_routier.repository.SuiviTravauxRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.Date;
+
 
 @Service
 public class ProjetService {
@@ -18,6 +21,9 @@ public class ProjetService {
     ProjetRepository projetRepository;
     @Autowired
     SuiviRepository suiviRepository;
+
+    @Autowired
+    SuiviTravauxRepository suiviTravauxRepository;
 
     public void saveProjet(Programme programme,Projet projet){
 
@@ -53,25 +59,42 @@ public class ProjetService {
         if(suiviDTO.getPrestataire()!=null){
             projet.setPrestataire(suiviDTO.getPrestataire());
         }
+
         if(projet.getBudget_n() < suiviDTO.getEngagement()){
 
             suivi.setEngagement(projet.getBudget_n());
             Projet newProjet = (Projet) projet.clone();
             newProjet.setId(0);
-            newProjet.setSuivi(null);
             newProjet.setFinancement("RESERVE");
-            newProjet.setBudget_n((suiviDTO.getEngagement() - projet.getBudget_n()));
+            newProjet.setPayement(null);
             newProjet.setSuivi(null);
+            newProjet.setBudget_n((suiviDTO.getEngagement() - projet.getBudget_n()));
             projetRepository.save(newProjet);
+            Suivi newSuivi=new Suivi(0,newProjet.getBudget_n(),suiviDTO.getStatut(),null,newProjet);
+            newProjet.setSuivi(newSuivi);
+            suiviRepository.save(newSuivi);
+
         }else {
             suivi.setEngagement(suiviDTO.getEngagement());
         }
 
         Suivi s=suiviRepository.findByProjet(projet);
-        projet.setSuivi(suivi);
+
         if(s!=null){
             suivi.setId(s.getId());
+            if(suivi.getStatut().equals("Visé")){
+                suivi.setEngagement(s.getEngagement());
+            }
         }
+        projet.setSuivi(suivi);
         suiviRepository.save(suivi);
+    }
+
+    public void saveSuiviTravaux(Projet projet, SuiviTravaux suiviTravaux){
+
+        suiviTravaux.setProjet(projet);
+        suiviTravaux.setDate(new Date());
+
+        suiviTravauxRepository.save(suiviTravaux);
     }
 }

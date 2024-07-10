@@ -2,6 +2,7 @@ package com.api.backend.Fonds_routier.controller;
 
 import com.api.backend.Fonds_routier.DTO.LoginDTO;
 import com.api.backend.Fonds_routier.DTO.MessageDTO;
+import com.api.backend.Fonds_routier.DTO.PasswordDTO;
 import com.api.backend.Fonds_routier.DTO.ResLoginDTO;
 import com.api.backend.Fonds_routier.model.Utilisateur;
 import com.api.backend.Fonds_routier.service.AccountService;
@@ -53,6 +54,23 @@ public class AcountController {
         return utilisateur;
     }
 
+
+    @PostMapping("/createUser")
+    public ResponseEntity<MessageDTO> createUser(@RequestBody Utilisateur utilisateur){
+
+        Utilisateur user=accountService.findUserByUsername(utilisateur.getUsername());
+
+        if(user!=null){
+            return ResponseEntity.ok(new MessageDTO("erreur","Le username que vous avez entré est déja utilisé, veuillez choisir un autre"));
+        }
+
+        utilisateur.setPassword("fonds*2024");
+        accountService.saveUser(utilisateur);
+
+        return ResponseEntity.ok(new MessageDTO("succes","utlisateur créé avec succès"));
+
+    }
+
     @PutMapping("/updateUser")
     public ResponseEntity<MessageDTO> updateProfil(@RequestHeader("Authorization") String token ,@RequestBody Utilisateur update){
 
@@ -75,19 +93,29 @@ public class AcountController {
 
     }
 
-    @PostMapping("/createUser")
-    public ResponseEntity<MessageDTO> createUser(@RequestBody Utilisateur utilisateur){
+    @PutMapping("/updatePassword")
+    public ResponseEntity<MessageDTO> updatePassword(@RequestHeader("Authorization") String token ,@RequestBody PasswordDTO passwordDTO){
 
-        Utilisateur user=accountService.findUserByUsername(utilisateur.getUsername());
+        if(passwordDTO.getPassword()=="" ||passwordDTO.getConfirmPassword()=="" || passwordDTO.getNewPassword()=="" ){
 
-        if(user!=null){
-            return ResponseEntity.ok(new MessageDTO("erreur","Le username que vous avez entré est déja utilisé, veuillez choisir un autre"));
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+        if( !passwordDTO.getNewPassword().equals(passwordDTO.getConfirmPassword()) ){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Mot de passe de confirmation incorrect"));
         }
 
-        utilisateur.setPassword("fonds*2024");
-        accountService.savaUser(utilisateur);
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Utilisateur utilisateur= accountService.findUser(jwt.getClaim("ref"));
 
-        return ResponseEntity.ok(new MessageDTO("succes","utlisateur créé avec succès"));
+        if( !utilisateur.getPassword().equals(passwordDTO.getPassword()) ){
+            return ResponseEntity.ok(new MessageDTO("erreur","Mot de passe actuel incorrect, veuillez réessayer avec le bon mot de passe"));
+        }
+
+        utilisateur.setPassword(passwordDTO.getNewPassword());
+        accountService.saveUser(utilisateur);
+
+        return ResponseEntity.ok(new MessageDTO("succes","Mot de passe modifié avec succès"));
 
     }
 
