@@ -1,4 +1,3 @@
-From openjdk:8-jdk-alpine
-ARG JAR_FILE=target/*.jar
-COPY ./target/Fonds_routier-0.0.1-SNAPSHOT.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+From openjdk:17
+ADD target/Fonds_routier-0.0.1-SNAPSHOT.jar Fonds_routier.jar
+ENTRYPOINT ["java","-jar","Fonds_routier.jar"]
