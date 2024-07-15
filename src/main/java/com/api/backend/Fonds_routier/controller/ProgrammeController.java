@@ -103,6 +103,14 @@ public class ProgrammeController {
         return programmeService.getProgrammeByStatut(ProgrammeStatut.CLOTURER);
     }
 
+    @GetMapping("/getCloseProgrammeByRole")
+    public List<Programme>  getCloseProgrammeByRole(@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        List<Programme> list=programmeService.getProgrammeByOrdonnateurAndStatut(Ordonnateur.valueOf(jwt.getClaim("role")),List.of(ProgrammeStatut.VALIDER));
+        return list;
+    }
+
     @GetMapping("/getValidAndCloseProgramme")
     public List<Programme>  getValidAndCloseProgramme(){
 
@@ -148,15 +156,12 @@ public class ProgrammeController {
         }
         if(programme.getStatut()!=ProgrammeStatut.VALIDER ){
 
-            Programme clone= (Programme) programme.clone();
-            clone.setId(0);
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-
+            return ResponseEntity.ok(new MessageDTO("erreur","vous avez la possibilité de modifier ce programme"));
         }
 
+        programmeService.ajusterProgramme(programme);
 
-
-        return ResponseEntity.ok(new MessageDTO("succes","programme supprimé avec succès"));
+        return ResponseEntity.ok(new MessageDTO("succes","programme ajusté avec succès"));
     }
 
 

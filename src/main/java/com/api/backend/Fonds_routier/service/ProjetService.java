@@ -97,4 +97,23 @@ public class ProjetService {
 
         suiviTravauxRepository.save(suiviTravaux);
     }
+
+    public SuiviTravaux findSuiviTravaux(long id){
+
+        return suiviTravauxRepository.findById(id).orElse(null);
+    }
+
+    public void updateSuiviTravaux(SuiviTravaux suiviTravaux ,SuiviTravaux update){
+
+        suiviTravaux.setDescription(update.getDescription());
+        suiviTravaux.setTauxAvancement(update.getTauxAvancement());
+        suiviTravaux.setTauxConsommation(update.getTauxConsommation());
+
+        suiviTravauxRepository.save(suiviTravaux);
+    }
+
+    public void deleteSuiviTravaux(long id){
+
+        suiviTravauxRepository.deleteById(id);
+    }
 }

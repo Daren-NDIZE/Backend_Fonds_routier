@@ -10,13 +10,14 @@ import java.util.Date;
 
 @Entity
 @Data @AllArgsConstructor @NoArgsConstructor
-public class Payement {
+public class Payement implements Cloneable {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
     private String decompte;
     private double m_TTC;
     private double air;
+    private double m_AIR;
     private double nap;
     private double m_TVA;
     private double m_HTVA;
@@ -27,5 +28,9 @@ public class Payement {
 
     @ManyToOne @JsonIgnore
     private Projet projet;
+
+    public Object clone() throws CloneNotSupportedException{
+        return super.clone();
+    }
 
 }

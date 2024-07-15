@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Data @AllArgsConstructor @NoArgsConstructor
-public class Suivi {
+public class Suivi implements Cloneable{
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
@@ -20,4 +20,8 @@ public class Suivi {
     private String motif;
     @OneToOne(mappedBy = "suivi") @JsonIgnore
     private Projet projet;
+
+    public Object clone() throws CloneNotSupportedException{
+        return super.clone();
+    }
 }

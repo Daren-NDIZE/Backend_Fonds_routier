@@ -23,7 +23,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
 
 @RestController
 public class ProjetController {
@@ -316,6 +317,49 @@ public class ProjetController {
 
     }
 
+    @PutMapping("/projet/updatePayement/{id}")
+    public  ResponseEntity<MessageDTO> updatePayement(@PathVariable(value = "id") long id, @RequestBody Payement update){
+
+        Payement payement= payementService.findPayement(id);
+        if(payement==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","payement inexistant"));
+        }
+        if(payement.getM_HTVA()<=0 || payement.getDecompte()==null || ( payement.getAir()!=5.5 && payement.getAir()!=2.2 ) ){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement les champs"));
+        }
+
+        long j= (new Date().getTime()- payement.getDate().getTime())/86400000;
+
+        if(j > 5){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible de modifier ce payement car il a été enregistré il y'a plus d'une semaine"));
+        }
+
+        payementService.updatePayement(payement,update);
+
+        return ResponseEntity.ok(new MessageDTO("succes","payement modifié avec succès"));
+
+    }
+
+    @DeleteMapping("/projet/deletePayement/{id}")
+    public  ResponseEntity<MessageDTO> deletePayement(@PathVariable(value = "id") long id){
+
+        Payement payement= payementService.findPayement(id);
+        if(payement==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","payement inexistant"));
+        }
+
+        long j= (new Date().getTime()-payement.getDate().getTime())/86400000;
+        if(j > 5){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible de supprimer ce payement car il a été enregistré il y'a plus d'une semaine"));
+        }
+
+        payementService.deletePayement(id);
+
+        return ResponseEntity.ok(new MessageDTO("succes","payement supprimé avec succès"));
+
+    }
+
     @PostMapping("/projet/saveSuiviTravaux/{id}")
     public ResponseEntity<MessageDTO> saveSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux suiviTravaux){
 
@@ -330,10 +374,63 @@ public class ProjetController {
 
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
+        if( suiviTravaux.getTauxAvancement()>100 || suiviTravaux.getTauxConsommation()>100){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","les taux doivent être inférieur à 100%"));
+        }
 
         projetService.saveSuiviTravaux(projet,suiviTravaux);
 
         return ResponseEntity.ok(new MessageDTO("succes","suivi des travaux enregistré avec succès"));
 
+    }
+
+    @PutMapping("/projet/updateSuiviTravaux/{id}")
+    public ResponseEntity<MessageDTO> updateSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux update){
+
+        SuiviTravaux suiviTravaux=projetService.findSuiviTravaux(id);
+        if(suiviTravaux==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","suivi  inexistant"));
+        }
+
+        if( update.getDescription()==null || update.getTauxAvancement()<=0 || update.getTauxConsommation()<=0){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+        if( update.getTauxAvancement()>100 || update.getTauxConsommation()>100){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","les taux doivent être inférieur à 100%"));
+        }
+
+        long j= (new Date().getTime()- suiviTravaux.getDate().getTime())/86400000;
+
+        if(j > 5){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible de modifier ce suivi car il a été enregistré il y'a plus d'une semaine"));
+        }
+
+        projetService.updateSuiviTravaux(suiviTravaux,update);
+
+        return ResponseEntity.ok(new MessageDTO("succes","suivi des travaux modifié avec succès"));
+
+    }
+
+    @DeleteMapping("/projet/deleteSuiviTravaux/{id}")
+    public ResponseEntity<MessageDTO> deleteSuiviTravaux(@PathVariable(value = "id") long id){
+
+        SuiviTravaux suiviTravaux =projetService.findSuiviTravaux(id);
+
+        if(suiviTravaux==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","suivi  inexistant"));
+        }
+
+        long j= (new Date().getTime()-suiviTravaux.getDate().getTime())/86400000;
+
+        if(j > 7){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible de supprimer ce suivi car il a été enregistré il y'a plus d'une semaine"));
+        }
+
+        projetService.deleteSuiviTravaux(id);
+
+        return ResponseEntity.ok(new MessageDTO("succes","suivi supprimé avec succès"));
     }
 }

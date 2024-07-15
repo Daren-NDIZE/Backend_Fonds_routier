@@ -20,6 +20,8 @@ public interface ProgrammeRepository extends JpaRepository<Programme,Long> {
 
     List<Programme> findAllByStatutIn(List<ProgrammeStatut> status);
 
+    List<Programme> findAllByOrdonnateurAndStatutIn(Ordonnateur ordonnateur,List<ProgrammeStatut> status);
+
     @Query("FROM Programme WHERE statut IN ('VALIDER','CLOTURER') AND ordonnateur= ?1 AND type= ?2 AND annee= ?3 ORDER BY id DESC LIMIT 1")
     Programme findSyntheseProgramme(Ordonnateur ordonnateur, ProgrammeType type, int annee);
 

@@ -10,7 +10,7 @@ import java.util.Date;
 
 @Entity
 @Data @AllArgsConstructor @NoArgsConstructor
-public class SuiviTravaux {
+public class SuiviTravaux implements Cloneable {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
@@ -22,4 +22,8 @@ public class SuiviTravaux {
     private String description;
     @ManyToOne @JsonIgnore
     private Projet projet;
+
+    public Object clone() throws CloneNotSupportedException{
+        return super.clone();
+    }
 }

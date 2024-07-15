@@ -6,7 +6,7 @@ import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.*;
-import com.api.backend.Fonds_routier.repository.ProgrammeRepository;
+import com.api.backend.Fonds_routier.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +19,14 @@ public class ProgrammeService {
 
     @Autowired
     ProgrammeRepository programmeRepository;
+    @Autowired
+    ProjetRepository projetRepository;
+    @Autowired
+    SuiviTravauxRepository suiviTravauxRepository;
+    @Autowired
+    PayementRepository payementRepository;
+    @Autowired
+    SuiviRepository suiviRepository;
 
 
     public void saveProgramme(Programme programme){
@@ -120,6 +128,33 @@ public class ProgrammeService {
         return list;
     }
 
+    public List<Programme> getProgrammeByOrdonnateurAndStatut(Ordonnateur ordonnateur,List<ProgrammeStatut> status){
+
+        return programmeRepository.findAllByOrdonnateurAndStatutIn(ordonnateur, status);
+    }
+
+    public long totalBudget(List<Projet> projets){
+        long total = 0;
+
+        for(Projet projet: projets){
+            total=total + projet.getBudget_n();
+        }
+
+        return total;
+    }
+
+    public long totalEngagement(List<Projet> projets){
+        long total = 0;
+
+        for(Projet projet: projets){
+
+            if(projet.getSuivi()!=null){
+                total=total + projet.getSuivi().getEngagement();
+            }
+        }
+
+        return total;
+    }
 
     public SyntheseDTO syntheseProgramme(List<Programme> programmes, String ordonnateur){
 
@@ -226,30 +261,52 @@ public class ProgrammeService {
 
     }
 
+    public void ajusterProgramme(Programme programme) throws CloneNotSupportedException {
 
-    public long totalBudget(List<Projet> projets){
-        long total = 0;
+        Programme newProgramme= (Programme) programme.clone();
+        newProgramme.setId(0);
+        newProgramme.setObservation(null);
+        newProgramme.setUrl_resolution(null);
+        newProgramme.setStatut(ProgrammeStatut.EN_ATTENTE_DE_SOUMISSION);
+        newProgramme.setIntitule("programme ajusté "+programme.getOrdonnateur()+" "+programme.getAnnee());
+        newProgramme.setProjetList(null);
+        programmeRepository.save(newProgramme);
 
-        for(Projet projet: projets){
-            total=total + projet.getBudget_n();
-        }
+        for(Projet projet: programme.getProjetList()){
 
-        return total;
-    }
-
-    public long totalEngagement(List<Projet> projets){
-        long total = 0;
-
-        for(Projet projet: projets){
+            Projet cloneProjet= (Projet) projet.clone();
+            cloneProjet.setProgramme(newProgramme);
+            cloneProjet.setId(0);
+            cloneProjet.setSuivi(null);
+            cloneProjet.setPayement(null);
+            cloneProjet.setSuiviTravaux(null);
+            projetRepository.save(cloneProjet);
 
             if(projet.getSuivi()!=null){
-                total=total + projet.getSuivi().getEngagement();
+                Suivi suivi= (Suivi) projet.getSuivi().clone();
+                suivi.setProjet(null);
+                suivi.setId(0);
+                suivi.setProjet(cloneProjet);
+                suiviRepository.save(projet.getSuivi());
+            }
+
+            for(SuiviTravaux suiviTravaux: projet.getSuiviTravaux()){
+
+                suiviTravaux= (SuiviTravaux) suiviTravaux.clone();
+                suiviTravaux.setId(0);
+                suiviTravaux.setProjet(cloneProjet);
+                suiviTravauxRepository.save(suiviTravaux);
+            }
+            for(Payement payement : projet.getPayement()){
+                payement= (Payement) payement.clone();
+                payement.setId(0);
+                payement.setProjet(cloneProjet);
+                payementRepository.save(payement);
             }
         }
 
-        return total;
-    }
 
+    }
 
 }
 
