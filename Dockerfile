@@ -1,5 +1,5 @@
 From amazoncorretto:17-al2023-jdk
-WORKDIR /app
-COPY target/Fonds_routier-0.0.1-SNAPSHOT.jar Fonds_routier.jar
+VOLUME /tmp
+COPY target/*.jar app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","Fonds_routier.jar"]
