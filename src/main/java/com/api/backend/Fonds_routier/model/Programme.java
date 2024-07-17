@@ -36,7 +36,7 @@ public class Programme implements Cloneable {
     @Enumerated(EnumType.STRING) @NotNull
     private Ordonnateur ordonnateur;
 
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String observation;
     private String url_resolution;
     @OneToMany(fetch = FetchType.LAZY,mappedBy = "programme",cascade = CascadeType.REMOVE)

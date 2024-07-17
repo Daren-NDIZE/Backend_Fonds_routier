@@ -18,7 +18,7 @@ public class SuiviTravaux implements Cloneable {
     private Date date;
     private double tauxAvancement;
     private double tauxConsommation;
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
     @ManyToOne @JsonIgnore
     private Projet projet;
