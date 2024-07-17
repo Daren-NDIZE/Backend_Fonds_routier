@@ -38,9 +38,7 @@ public class AcountController {
                 return ResponseEntity.ok(new ResLoginDTO(false,""));
             }
 
-            return ResponseEntity.ok(new ResLoginDTO(true,
-                    accountService.generateToken( utilisateur )
-                    ));
+            return ResponseEntity.ok(new ResLoginDTO(true, accountService.generateToken( utilisateur )));
 
         }
     }
