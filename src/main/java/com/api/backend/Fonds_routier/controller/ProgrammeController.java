@@ -7,6 +7,8 @@ import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.Programme;
+import com.api.backend.Fonds_routier.model.Projet;
+import com.api.backend.Fonds_routier.model.ProjetMINTP;
 import com.api.backend.Fonds_routier.service.ProgrammeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +29,7 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 public class ProgrammeController {
@@ -263,6 +266,20 @@ public class ProgrammeController {
 
             return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
         }
+        if(programme.getStatut()== ProgrammeStatut.CLOTURER){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme cloturé"));
+        }
+
+        List<Projet> projetList=  programme.getProjetList().stream().filter(p->p.getFinancement().equals("NORMAL")).collect(Collectors.toList());
+
+        long total=programmeService.totalBudget(projetList)+programme.getPrevision();
+
+        if(programme.getBudget()!=total){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","le budget total du programme que vous avez rempli lors de sa creation est différent du total actuel "));
+        }
+
 
         programmeService.submitProgramme(programme);
         return ResponseEntity.ok(new MessageDTO("succes","Programme soumis"));
@@ -302,6 +319,7 @@ public class ProgrammeController {
 
         return ResponseEntity.ok(new MessageDTO("succes","votre demmande a été executé"));
     }
+
 
     @GetMapping("/programme/getResolution/{id}")
     public ResponseEntity getResolution(@PathVariable(value = "id") long id) throws IOException {

@@ -87,6 +87,11 @@ public class ProgrammeService {
 
     }
 
+    public List<Programme> getProgrammeByOrdonnateurAndStatut(Ordonnateur ordonnateur,List<ProgrammeStatut> status){
+
+        return programmeRepository.findAllByOrdonnateurAndStatutIn(ordonnateur, status);
+    }
+
     public List<Programme> getSyntheseProgramme(ProgrammeFilterDTO filter)  {
 
         List<Programme> list = new ArrayList<>();
@@ -128,33 +133,6 @@ public class ProgrammeService {
         return list;
     }
 
-    public List<Programme> getProgrammeByOrdonnateurAndStatut(Ordonnateur ordonnateur,List<ProgrammeStatut> status){
-
-        return programmeRepository.findAllByOrdonnateurAndStatutIn(ordonnateur, status);
-    }
-
-    public long totalBudget(List<Projet> projets){
-        long total = 0;
-
-        for(Projet projet: projets){
-            total=total + projet.getBudget_n();
-        }
-
-        return total;
-    }
-
-    public long totalEngagement(List<Projet> projets){
-        long total = 0;
-
-        for(Projet projet: projets){
-
-            if(projet.getSuivi()!=null){
-                total=total + projet.getSuivi().getEngagement();
-            }
-        }
-
-        return total;
-    }
 
     public SyntheseDTO syntheseProgramme(List<Programme> programmes, String ordonnateur){
 
@@ -306,6 +284,29 @@ public class ProgrammeService {
         }
 
 
+    }
+
+    public long totalBudget(List<Projet> projets){
+        long total = 0;
+
+        for(Projet projet: projets){
+            total=total + projet.getBudget_n();
+        }
+
+        return total;
+    }
+
+    public long totalEngagement(List<Projet> projets){
+        long total = 0;
+
+        for(Projet projet: projets){
+
+            if(projet.getSuivi()!=null){
+                total=total + projet.getSuivi().getEngagement();
+            }
+        }
+
+        return total;
     }
 
 }
