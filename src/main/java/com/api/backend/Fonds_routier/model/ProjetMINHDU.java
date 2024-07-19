@@ -13,6 +13,7 @@ public class ProjetMINHDU extends Projet{
 
     @NotNull
     private String ville;
+    @NotNull
     private String type_travaux;
     @Column(columnDefinition = "TEXT")
     private String troçon;
