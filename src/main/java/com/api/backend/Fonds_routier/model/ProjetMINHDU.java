@@ -1,5 +1,6 @@
 package com.api.backend.Fonds_routier.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -14,6 +15,7 @@ public class ProjetMINHDU extends Projet{
     private String ville;
     @NotNull
     private String type_travaux;
+    @Column(columnDefinition = "TEXT")
     private String troçon;
     private float lineaire;
     @NotNull
