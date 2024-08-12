@@ -8,8 +8,8 @@ import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.Programme;
 import com.api.backend.Fonds_routier.model.Projet;
-import com.api.backend.Fonds_routier.model.ProjetMINTP;
 import com.api.backend.Fonds_routier.service.ProgrammeService;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.bind.annotation.*;
 import org.apache.commons.io.FilenameUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 
 import java.io.File;
@@ -27,7 +28,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -57,6 +57,12 @@ public class ProgrammeController {
             return ResponseEntity.ok(new MessageDTO("erreur","année incorrect"));
         }
 
+        List<Programme> list=programmeService.getProgrammeByOrdonnateurAndYear(Ordonnateur.valueOf(jwt.getClaim("role")),programme.getAnnee());
+
+        if(!list.isEmpty()){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous avez déja créé le programme de cette année"));
+        }
+
         programme.setStatut(ProgrammeStatut.EN_ATTENTE_DE_SOUMISSION);
         programme.setOrdonnateur(Ordonnateur.valueOf(jwt.getClaim("role")));
 
@@ -67,7 +73,22 @@ public class ProgrammeController {
         }
         programmeService.saveProgramme(programme);
 
-        return ResponseEntity.ok(new MessageDTO("succes","programme créer avec succès"));
+        return ResponseEntity.ok(new MessageDTO("succes","programme créé avec succès"));
+
+    }
+
+    @PostMapping("/saveReportProgramme")
+    public ResponseEntity<MessageDTO> saveProgramme(@RequestBody Programme programme){
+
+        LocalDate date = LocalDate.now();
+        programme.setAnnee(date.getYear());
+        programme.setType(ProgrammeType.REPORT);
+        programme.setStatut(ProgrammeStatut.SOUMIS);
+        programme.setIntitule("Programme report "+programme.getOrdonnateur()+" "+date.getYear());
+
+        programmeService.saveProgramme(programme);
+
+        return ResponseEntity.ok(new MessageDTO("succes","programme créé avec succès"));
 
     }
 
@@ -110,7 +131,7 @@ public class ProgrammeController {
     public List<Programme>  getCloseProgrammeByRole(@RequestHeader("Authorization") String token){
 
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List<Programme> list=programmeService.getProgrammeByOrdonnateurAndStatut(Ordonnateur.valueOf(jwt.getClaim("role")),List.of(ProgrammeStatut.VALIDER));
+        List<Programme> list=programmeService.getProgrammeByOrdonnateurAndStatut(Ordonnateur.valueOf(jwt.getClaim("role")),List.of(ProgrammeStatut.CLOTURER));
         return list;
     }
 
@@ -157,9 +178,13 @@ public class ProgrammeController {
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
         }
+        if(programme.getType()==ProgrammeType.REPORT ){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Il est impossible d'ajuster le programme des reports"));
+        }
         if(programme.getStatut()!=ProgrammeStatut.VALIDER ){
 
-            return ResponseEntity.ok(new MessageDTO("erreur","vous avez la possibilité de modifier ce programme"));
+            return ResponseEntity.ok(new MessageDTO("erreur","Ce programme n'a pas encore été validé"));
         }
 
         programmeService.ajusterProgramme(programme);
@@ -179,6 +204,7 @@ public class ProgrammeController {
         return ResponseEntity.ok(programme);
 
     }
+
 
     @GetMapping("/programmeByRole/{id}")
     public ResponseEntity getProgrammeById(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token){
@@ -297,6 +323,10 @@ public class ProgrammeController {
         if(programme.getStatut()!=ProgrammeStatut.SOUMIS){
             return ResponseEntity.ok(new MessageDTO("erreur","impossible car le programme n'a pas été soumis"));
         }
+        if(programme.getType()==ProgrammeType.REPORT && decision.getStatut()!=ProgrammeStatut.VALIDER){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible d'effectuer cette action"));
+        }
         if(decision.getFile()!=null){
             String extention= FilenameUtils.getExtension(decision.getFile().getOriginalFilename()) ;
 
@@ -315,11 +345,19 @@ public class ProgrammeController {
         }
         programme.setStatut(decision.getStatut());
         programme.setObservation(decision.getObservation());
+
+        if(programme.getProgramme()!=null && decision.getStatut()==ProgrammeStatut.VALIDER){
+
+            programme.setType(programme.getProgramme().getType());
+            programme.getProgramme().setStatut(ProgrammeStatut.CLOTURER);
+            programme.getProgramme().setIntitule("Programme initiale "+programme.getOrdonnateur()+" "+programme.getAnnee());
+            programmeService.saveProgramme(programme.getProgramme());
+
+        }
         programmeService.saveProgramme(programme);
 
         return ResponseEntity.ok(new MessageDTO("succes","votre demmande a été executé"));
     }
-
 
     @GetMapping("/programme/getResolution/{id}")
     public ResponseEntity getResolution(@PathVariable(value = "id") long id) throws IOException {
@@ -348,13 +386,40 @@ public class ProgrammeController {
     }
 
     @PostMapping("/programme/syntheseProgramme")
-    public ResponseEntity getFinalProgramme(@RequestBody ProgrammeFilterDTO filter){
+    public ResponseEntity<SyntheseDTO> getFinalProgramme(@RequestBody ProgrammeFilterDTO filter){
 
         List<Programme> list= programmeService.getSyntheseProgramme(filter);
 
         SyntheseDTO syntheseDTO=programmeService.syntheseProgramme(list, filter.getOrdonnateur());
 
         return ResponseEntity.ok(syntheseDTO);
+    }
+
+    @PostMapping("/programme/importProgrammeFile/{id}")
+    public ResponseEntity<MessageDTO> importExcel(@PathVariable(value = "id") long id,@RequestParam("file") MultipartFile file) {
+
+        Programme programme=programmeService.findProgramme(id);
+        if(programme==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
+        }
+        if(!programme.getProjetList().isEmpty()){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible, car le programme doit être vide"));
+        }
+        if(programme.getStatut()!=ProgrammeStatut.EN_ATTENTE_DE_SOUMISSION){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible , car se programme est en cours de traitement"));
+        }
+        try {
+            programmeService.importMINHDUProgramme(file.getInputStream(),programme);
+
+            return ResponseEntity.ok(new MessageDTO("succes","Importation réussi"));
+
+        } catch (IOException  | IllegalArgumentException   e) {
+            // Log the exception or handle it as needed
+            e.printStackTrace();
+            return ResponseEntity.ok(new MessageDTO("erreur","Erreur d'importation , votre fichier ne respecte pas les contraintes"));
+        }
     }
 }
 

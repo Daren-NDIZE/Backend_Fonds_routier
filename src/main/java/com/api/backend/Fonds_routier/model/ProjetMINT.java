@@ -11,9 +11,11 @@ import lombok.NoArgsConstructor;
 @Data @NoArgsConstructor @AllArgsConstructor
 public class ProjetMINT extends Projet{
 
+    @Column(columnDefinition = "TEXT")
     private String mission;
     @Column(columnDefinition = "TEXT")
     private String objectif;
+    @Column(columnDefinition = "TEXT")
     private String allotissement;
     @NotNull
     private String ordonnateur;

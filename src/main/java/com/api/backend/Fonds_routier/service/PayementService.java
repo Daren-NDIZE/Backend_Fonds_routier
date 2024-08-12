@@ -18,10 +18,11 @@ public class PayementService {
 
         payement.setProjet(projet);
         payement.setDate(new Date());
-        payement.setM_TVA(0.1925*payement.getM_HTVA());
-        payement.setM_TTC((payement.getM_HTVA()*0.1925 + payement.getM_HTVA()));
-        payement.setNap(payement.getM_HTVA()*(1- payement.getAir()/100));
-        payement.setM_AIR(payement.getAir()*payement.getM_HTVA()/100);
+
+        payement.setM_TVA(Math.round(19.25*payement.getM_HTVA())/100.0);
+        payement.setM_TTC(Math.round(payement.getM_HTVA()*119.25)/100.0 );
+        payement.setNap( Math.round( payement.getM_HTVA()*(100- payement.getAir()) )/100.0 );
+        payement.setM_AIR(Math.round(payement.getAir()*payement.getM_HTVA())/100.0);
 
         payementRepository.save(payement);
     }
@@ -34,13 +35,16 @@ public class PayementService {
     public void updatePayement(Payement payement, Payement update){
 
         payement.setDecompte(update.getDecompte());
+        payement.setN_marche(update.getN_marche());
         payement.setObservation(update.getObservation());
         payement.setM_HTVA(update.getM_HTVA());
         payement.setAir(update.getAir());
-        payement.setM_TVA(0.1925*update.getM_HTVA());
-        payement.setM_TTC(update.getM_HTVA()*0.1925+update.getM_HTVA());
-        payement.setNap(update.getM_HTVA()*(1- update.getAir()/100));
-        payement.setM_AIR(update.getAir()*update.getM_HTVA()/100);
+
+        payement.setM_TVA(Math.round(19.25*update.getM_HTVA())/100.0);
+        payement.setM_TTC(Math.round(update.getM_HTVA()*119.25)/100.0 );
+        payement.setNap( Math.round( update.getM_HTVA()*(100- update.getAir()) )/100.0 );
+        payement.setM_AIR(Math.round(update.getAir()*update.getM_HTVA())/100.0);
+
         payementRepository.save(payement);
     }
 

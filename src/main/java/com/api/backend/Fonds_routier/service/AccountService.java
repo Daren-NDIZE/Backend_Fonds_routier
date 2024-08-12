@@ -1,7 +1,11 @@
 package com.api.backend.Fonds_routier.service;
 
+import com.api.backend.Fonds_routier.DTO.UserDTO;
 import com.api.backend.Fonds_routier.enums.UserRole;
+import com.api.backend.Fonds_routier.model.Action;
+import com.api.backend.Fonds_routier.model.Role;
 import com.api.backend.Fonds_routier.model.Utilisateur;
+import com.api.backend.Fonds_routier.repository.ActionRepository;
 import com.api.backend.Fonds_routier.repository.UtilisateurRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -13,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -22,6 +27,7 @@ public class AccountService {
     JwtEncoder jwtEncoder;
     @Autowired
     private UtilisateurRepository utilisateurRepository;
+    private ActionRepository actionRepository;
 
 
     public Utilisateur findUserByUsername(String nom){
@@ -40,23 +46,37 @@ public class AccountService {
         utilisateur.setPrenom(update.getPrenom());
         utilisateur.setEmail(update.getEmail());
         utilisateur.setTelephone(update.getTelephone());
-        utilisateur.setUsername(update.getUsername());
 
         utilisateurRepository.save(utilisateur);
     }
 
 
-    public void saveUser(Utilisateur utilisateur){
+    public void saveUser(UserDTO userDTO,Role role){
+
+        Utilisateur utilisateur=new Utilisateur();
+
+        utilisateur.setNom(userDTO.getNom());
+        utilisateur.setPrenom(userDTO.getPrenom());
+        utilisateur.setUsername(userDTO.getUsername());
+        utilisateur.setPassword("fonds*2024");
+        utilisateur.setRole(role);
+        utilisateur.setEmail(userDTO.getEmail());
+        utilisateur.setTelephone(userDTO.getTelephone());
 
         utilisateurRepository.save(utilisateur);
     }
 
-    public List<Utilisateur> getAllUser(long id){
+    public void save(Utilisateur utilisateur){
 
-        return utilisateurRepository.findByIdIsNot(id);
+        utilisateurRepository.save(utilisateur);
     }
 
-    public Utilisateur getUserByRole(UserRole role){
+    public List<Utilisateur> getAllUser(){
+
+        return utilisateurRepository.findAll();
+    }
+
+    public Utilisateur getUserByRole(Role role){
 
         return utilisateurRepository.findByRole(role);
     }
@@ -68,8 +88,7 @@ public class AccountService {
                 .issuedAt(instant)
                 .expiresAt(instant.plus(10, ChronoUnit.HOURS))
                 .subject(utilisateur.getUsername())
-                .claim("role",utilisateur.getRole())
-                .claim("ref",utilisateur.getId())
+                .claim("role", utilisateur.getRole().getRoleName())
                 .build();
         JwtEncoderParameters jwtEncoderParameters=JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS512).build(),
@@ -77,4 +96,15 @@ public class AccountService {
         );
         return jwtEncoder.encode(jwtEncoderParameters).getTokenValue();
     }
+
+    public void saveAction(Action action){
+        action.setDate(new Date());
+        actionRepository.save(action);
+    }
+
+    public List<Action> findActionByDate(Date firstDate, Date secondDate){
+
+       return actionRepository.findByDateBetween(firstDate,secondDate);
+    }
+
 }

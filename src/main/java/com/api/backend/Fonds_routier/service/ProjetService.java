@@ -11,6 +11,8 @@ import com.api.backend.Fonds_routier.repository.SuiviTravauxRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 
@@ -32,11 +34,25 @@ public class ProjetService {
         projetRepository.save(projet);
     }
 
+    public void saveProvisionProjet(Programme programme,Projet projet){
+
+        projet.setProgramme(programme);
+        projet.setFinancement("RESERVE");
+        projetRepository.save(projet);
+        Suivi newSuivi=new Suivi(0,projet.getBudget_n(),"Transmis pour visa",null,projet);
+        projet.setSuivi(newSuivi);
+        suiviRepository.save(newSuivi);
+
+    }
+
     public void updateProjet(Projet projet, Projet update){
 
         update.setId(projet.getId());
         update.setProgramme(projet.getProgramme());
         update.setFinancement(projet.getFinancement());
+        update.setSuivi(projet.getSuivi());
+        update.setSuiviTravaux(projet.getSuiviTravaux());
+        update.setPayement(projet.getPayement());
         projetRepository.save(update);
     }
 
@@ -52,8 +68,12 @@ public class ProjetService {
 
     public void setSuivi(Projet projet, SuiviDTO suiviDTO) throws CloneNotSupportedException {
 
+        LocalDateTime now=LocalDateTime.now();
+
+        String date=now.format(DateTimeFormatter.ofPattern("dd/MM/YYYY"));
+
         Suivi suivi=new Suivi();
-        suivi.setStatut(suiviDTO.getStatut());
+        suivi.setStatut(suiviDTO.getStatut()+" le "+date);
         suivi.setMotif(suiviDTO.getMotif());
 
         if(suiviDTO.getPrestataire()!=null){
@@ -67,6 +87,7 @@ public class ProjetService {
             newProjet.setId(0);
             newProjet.setFinancement("RESERVE");
             newProjet.setPayement(null);
+            newProjet.setSuiviTravaux(null);
             newProjet.setSuivi(null);
             newProjet.setBudget_n((suiviDTO.getEngagement() - projet.getBudget_n()));
             projetRepository.save(newProjet);
@@ -82,7 +103,7 @@ public class ProjetService {
 
         if(s!=null){
             suivi.setId(s.getId());
-            if(suivi.getStatut().equals("Visé")){
+            if(suiviDTO.getStatut().equals("Visé")){
                 suivi.setEngagement(s.getEngagement());
             }
         }

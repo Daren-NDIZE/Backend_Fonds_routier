@@ -4,6 +4,7 @@ import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.Programme;
+import org.aspectj.weaver.ast.Or;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -17,6 +18,8 @@ public interface ProgrammeRepository extends JpaRepository<Programme,Long> {
     List <Programme> findAllByOrdonnateur(Ordonnateur ordonnateur);
 
     List<Programme> findByStatut(ProgrammeStatut status);
+
+    List<Programme> findByOrdonnateurAndAnnee(Ordonnateur ordonnateur,int annee);
 
     List<Programme> findAllByStatutIn(List<ProgrammeStatut> status);
 

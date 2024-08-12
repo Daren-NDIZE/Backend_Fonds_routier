@@ -42,6 +42,9 @@ public class Programme implements Cloneable {
     @OneToMany(fetch = FetchType.LAZY,mappedBy = "programme",cascade = CascadeType.REMOVE)
     private List<Projet> projetList;
 
+    @JsonIgnore @OneToOne
+    private Programme programme;
+
 
     public Object clone() throws CloneNotSupportedException{
         return super.clone();

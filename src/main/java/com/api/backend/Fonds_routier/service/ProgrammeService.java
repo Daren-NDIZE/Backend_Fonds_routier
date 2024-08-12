@@ -5,11 +5,17 @@ import com.api.backend.Fonds_routier.DTO.SyntheseDTO;
 import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
+import com.api.backend.Fonds_routier.enums.Region;
 import com.api.backend.Fonds_routier.model.*;
 import com.api.backend.Fonds_routier.repository.*;
+import jakarta.validation.ConstraintViolationException;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -85,6 +91,11 @@ public class ProgrammeService {
 
         return programmeRepository.findAllByStatutIn(statuts);
 
+    }
+
+    public List<Programme> getProgrammeByOrdonnateurAndYear(Ordonnateur ordonnateur, int annee){
+
+        return programmeRepository.findByOrdonnateurAndAnnee(ordonnateur, annee);
     }
 
     public List<Programme> getProgrammeByOrdonnateurAndStatut(Ordonnateur ordonnateur,List<ProgrammeStatut> status){
@@ -239,53 +250,6 @@ public class ProgrammeService {
 
     }
 
-    public void ajusterProgramme(Programme programme) throws CloneNotSupportedException {
-
-        Programme newProgramme= (Programme) programme.clone();
-        newProgramme.setId(0);
-        newProgramme.setObservation(null);
-        newProgramme.setUrl_resolution(null);
-        newProgramme.setStatut(ProgrammeStatut.EN_ATTENTE_DE_SOUMISSION);
-        newProgramme.setIntitule("programme ajusté "+programme.getOrdonnateur()+" "+programme.getAnnee());
-        newProgramme.setProjetList(null);
-        programmeRepository.save(newProgramme);
-
-        for(Projet projet: programme.getProjetList()){
-
-            Projet cloneProjet= (Projet) projet.clone();
-            cloneProjet.setProgramme(newProgramme);
-            cloneProjet.setId(0);
-            cloneProjet.setSuivi(null);
-            cloneProjet.setPayement(null);
-            cloneProjet.setSuiviTravaux(null);
-            projetRepository.save(cloneProjet);
-
-            if(projet.getSuivi()!=null){
-                Suivi suivi= (Suivi) projet.getSuivi().clone();
-                suivi.setProjet(null);
-                suivi.setId(0);
-                suivi.setProjet(cloneProjet);
-                suiviRepository.save(projet.getSuivi());
-            }
-
-            for(SuiviTravaux suiviTravaux: projet.getSuiviTravaux()){
-
-                suiviTravaux= (SuiviTravaux) suiviTravaux.clone();
-                suiviTravaux.setId(0);
-                suiviTravaux.setProjet(cloneProjet);
-                suiviTravauxRepository.save(suiviTravaux);
-            }
-            for(Payement payement : projet.getPayement()){
-                payement= (Payement) payement.clone();
-                payement.setId(0);
-                payement.setProjet(cloneProjet);
-                payementRepository.save(payement);
-            }
-        }
-
-
-    }
-
     public long totalBudget(List<Projet> projets){
         long total = 0;
 
@@ -307,6 +271,182 @@ public class ProgrammeService {
         }
 
         return total;
+    }
+
+    public void ajusterProgramme(Programme programme) throws CloneNotSupportedException {
+
+        Programme newProgramme= (Programme) programme.clone();
+        newProgramme.setId(0);
+        newProgramme.setType(ProgrammeType.AJUSTER);
+        newProgramme.setObservation(null);
+        newProgramme.setUrl_resolution(null);
+        newProgramme.setProgramme(programme);
+        newProgramme.setStatut(ProgrammeStatut.EN_ATTENTE_DE_SOUMISSION);
+        newProgramme.setIntitule("programme ajusté "+programme.getOrdonnateur()+" "+programme.getAnnee());
+        newProgramme.setProjetList(null);
+        programmeRepository.save(newProgramme);
+
+        for(Projet projet: programme.getProjetList()){
+
+            Projet cloneProjet= (Projet) projet.clone();
+            cloneProjet.setProgramme(newProgramme);
+            cloneProjet.setId(0);
+            cloneProjet.setSuivi(null);
+            cloneProjet.setPayement(null);
+            cloneProjet.setSuiviTravaux(null);
+            projetRepository.save(cloneProjet);
+
+            if(projet.getSuivi()!=null){
+                Suivi suivi= (Suivi) projet.getSuivi().clone();
+                suivi.setId(0);
+                suivi.setProjet(cloneProjet);
+                cloneProjet.setSuivi(suivi);
+                suiviRepository.save(suivi);
+            }
+
+            for(SuiviTravaux suiviTravaux: projet.getSuiviTravaux()){
+
+                suiviTravaux= (SuiviTravaux) suiviTravaux.clone();
+                suiviTravaux.setId(0);
+                suiviTravaux.setProjet(cloneProjet);
+                suiviTravauxRepository.save(suiviTravaux);
+            }
+            for(Payement payement : projet.getPayement()){
+                payement= (Payement) payement.clone();
+                payement.setId(0);
+                payement.setProjet(cloneProjet);
+                payementRepository.save(payement);
+            }
+        }
+
+
+    }
+
+    public void importMINHDUProgramme(InputStream inputStream ,Programme programme) throws IOException {
+        List<ProjetMINHDU> list = new ArrayList<>();
+        List ordonnateur=List.of("MAIRE","MINHDU");
+
+        Workbook workbook = WorkbookFactory.create(inputStream);
+        Sheet sheet = workbook.getSheetAt(0);
+
+        for (Row row : sheet) {
+            if (row.getRowNum() == 0) {
+                continue; // Skip the header row
+            }
+
+            ProjetMINHDU projetMINHDU = new ProjetMINHDU();
+            projetMINHDU.setProgramme(programme);
+
+            for (int i = 0; i <= 12; i++) {
+                Cell cell = CellUtil.getCell(row, i);
+                if (cell != null) {
+                    switch (i) {
+                        case 1:
+                            if (cell.getCellType() == CellType.STRING) {
+
+                                String region=cell.getStringCellValue().replace("-","_");
+                                projetMINHDU.setRegion(Region.valueOf(region));
+                            }else{
+                                throw (new IllegalArgumentException());
+                            }
+                            break;
+                        case 2:
+                            if (cell.getCellType() == CellType.STRING ) {
+                                projetMINHDU.setVille(cell.getStringCellValue());
+
+                            }else {
+                                throw (new IllegalArgumentException());
+                            }
+                            break;
+                        case 3:
+                            if (cell.getCellType() == CellType.STRING) {
+
+                                projetMINHDU.setType_travaux(cell.getStringCellValue());
+
+                            }else{
+                                throw (new IllegalArgumentException());
+                            }
+                            break;
+                        case 4:
+                            if (cell.getCellType() == CellType.STRING) {
+
+                                projetMINHDU.setTroçon(cell.getStringCellValue());
+                            }else {
+                                throw (new IllegalArgumentException());
+
+                            }
+                            break;
+                        case 5:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINHDU.setLineaire((float) cell.getNumericCellValue());
+                            }
+                            break;
+                        case 6:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+
+                                projetMINHDU.setTtc((long) cell.getNumericCellValue());
+                            }else{
+                                throw (new IllegalArgumentException());
+                            }
+                            break;
+                        case 7:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINHDU.setBudget_anterieur((long) cell.getNumericCellValue());
+                            }
+                            break;
+                        case 8:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINHDU.setBudget_n((long) cell.getNumericCellValue());
+                            }else {
+                                throw (new IllegalArgumentException());
+
+                            }
+                            break;
+                        case 9:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINHDU.setBudget_n1((long) cell.getNumericCellValue());
+                            }
+                            break;
+                        case 10:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINHDU.setBudget_n2((long) cell.getNumericCellValue());
+                            }
+                            break;
+                        case 11:
+                            if (cell.getCellType() == CellType.STRING) {
+                                projetMINHDU.setPrestataire(cell.getStringCellValue());
+                            }
+                            break;
+                        case 12:
+                            if (cell.getCellType() == CellType.STRING && ordonnateur.contains(cell.getStringCellValue())) {
+
+                                projetMINHDU.setOrdonnateur(cell.getStringCellValue());
+
+                            }else {
+                                throw (new IllegalArgumentException());
+                            }
+                            break;
+                        case 13:
+                            if (cell.getCellType() == CellType.STRING) {
+                                projetMINHDU.setObservation(cell.getStringCellValue());
+                            }
+                            break;
+                        default:
+                            // Handle unknown columns or ignore them
+                            break;
+                    }
+                }
+            }
+
+            list.add(projetMINHDU);
+        }
+
+        projetRepository.saveAll(list);
+
+
+        if (workbook != null) {
+            workbook.close();
+        }
     }
 
 }

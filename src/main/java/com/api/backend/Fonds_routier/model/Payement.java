@@ -15,6 +15,7 @@ public class Payement implements Cloneable {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
     private String decompte;
+    private String n_marche;
     private double m_TTC;
     private double air;
     private double m_AIR;

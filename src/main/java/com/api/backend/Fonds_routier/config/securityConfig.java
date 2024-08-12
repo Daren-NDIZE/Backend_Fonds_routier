@@ -1,15 +1,19 @@
 package com.api.backend.Fonds_routier.config;
 
 import com.api.backend.Fonds_routier.enums.UserRole;
+import com.api.backend.Fonds_routier.model.Role;
 import com.api.backend.Fonds_routier.model.Utilisateur;
 import com.api.backend.Fonds_routier.repository.UtilisateurRepository;
 import com.api.backend.Fonds_routier.service.AccountService;
+import com.api.backend.Fonds_routier.service.RoleService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -26,10 +30,12 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
+import java.util.List;
 
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(securedEnabled = true)
 public class securityConfig  {
 
     @Bean
@@ -47,6 +53,7 @@ public class securityConfig  {
                 .authorizeHttpRequests(ar->ar.requestMatchers("/login").permitAll())
                 .authorizeHttpRequests(ar->ar.anyRequest().authenticated())
                 .oauth2ResourceServer(oa->oa.jwt(Customizer.withDefaults()))
+                .httpBasic(Customizer.withDefaults())
                 .build();
     }
 
@@ -81,14 +88,19 @@ public class securityConfig  {
     }
 
     @Bean
-    CommandLineRunner initDatabase(AccountService accountService) {
+    CommandLineRunner initDatabase(AccountService accountService, RoleService roleService) {
 
         return args->{
 
-            Utilisateur utilisateur=accountService.getUserByRole(UserRole.ADMIN);
-            if(utilisateur==null){
+            List<Utilisateur> utilisateurs=accountService.getAllUser();
 
-                accountService.saveUser(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",0,"admin@gmail.com",UserRole.ADMIN,"fonds*2024"));
+            if(utilisateurs.isEmpty()){
+
+                Role role= new Role();
+                role.setRoleName("ADMIN");
+                role.setDescription("Administrateur de l'application");
+                roleService.saveRole(role);
+                accountService.save(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",0,"admin@gmail.com",role,"fonds*2024"));
                 System.out.println("data initialized");
             }
         };
