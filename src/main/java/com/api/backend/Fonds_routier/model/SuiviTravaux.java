@@ -2,6 +2,7 @@ package com.api.backend.Fonds_routier.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,10 +17,20 @@ public class SuiviTravaux implements Cloneable {
     private long id;
     @Temporal(TemporalType.DATE)
     private Date date;
+    @NotNull
+    private Date dateOs;
+    @NotNull
+    private String numeroMarche;
+    @NotNull
     private double tauxAvancement;
+    @NotNull
     private double tauxConsommation;
     @Column(columnDefinition = "TEXT")
     private String description;
+    @Column(columnDefinition = "TEXT")
+    private String proposition;
+    @NotNull
+    private String contractualisation;
     @ManyToOne @JsonIgnore
     private Projet projet;
 

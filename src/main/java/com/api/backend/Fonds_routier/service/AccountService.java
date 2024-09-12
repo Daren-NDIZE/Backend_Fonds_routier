@@ -8,6 +8,7 @@ import com.api.backend.Fonds_routier.model.Utilisateur;
 import com.api.backend.Fonds_routier.repository.ActionRepository;
 import com.api.backend.Fonds_routier.repository.UtilisateurRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -26,8 +27,13 @@ public class AccountService {
     @Autowired
     JwtEncoder jwtEncoder;
     @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
     private UtilisateurRepository utilisateurRepository;
+    @Autowired
     private ActionRepository actionRepository;
+
+    public static final String defaultPassword="fonds*2024";
 
 
     public Utilisateur findUserByUsername(String nom){
@@ -50,7 +56,6 @@ public class AccountService {
         utilisateurRepository.save(utilisateur);
     }
 
-
     public void saveUser(UserDTO userDTO,Role role){
 
         Utilisateur utilisateur=new Utilisateur();
@@ -58,7 +63,7 @@ public class AccountService {
         utilisateur.setNom(userDTO.getNom());
         utilisateur.setPrenom(userDTO.getPrenom());
         utilisateur.setUsername(userDTO.getUsername());
-        utilisateur.setPassword("fonds*2024");
+        utilisateur.setPassword(passwordEncoder.encode(defaultPassword));
         utilisateur.setRole(role);
         utilisateur.setEmail(userDTO.getEmail());
         utilisateur.setTelephone(userDTO.getTelephone());
@@ -69,6 +74,11 @@ public class AccountService {
     public void save(Utilisateur utilisateur){
 
         utilisateurRepository.save(utilisateur);
+    }
+
+    public void deleteUser(long id){
+
+        utilisateurRepository.deleteById(id);
     }
 
     public List<Utilisateur> getAllUser(){

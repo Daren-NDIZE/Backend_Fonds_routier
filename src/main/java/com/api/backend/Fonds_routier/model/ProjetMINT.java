@@ -19,5 +19,7 @@ public class ProjetMINT extends Projet{
     private String allotissement;
     @NotNull
     private String ordonnateur;
+    private String departement;
+    private String commune;
 
 }

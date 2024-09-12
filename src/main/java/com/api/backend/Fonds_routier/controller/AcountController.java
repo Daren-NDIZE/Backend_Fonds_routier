@@ -5,17 +5,20 @@ import com.api.backend.Fonds_routier.model.Action;
 import com.api.backend.Fonds_routier.model.Role;
 import com.api.backend.Fonds_routier.model.Utilisateur;
 import com.api.backend.Fonds_routier.service.AccountService;
+import com.api.backend.Fonds_routier.service.HTTPService;
 import com.api.backend.Fonds_routier.service.RoleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
+import java.io.IOException;
+import java.net.ConnectException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -26,29 +29,29 @@ public class AcountController {
     @Autowired
     private AccountService accountService;
     @Autowired
+    PasswordEncoder passwordEncoder;
+    @Autowired
     private RoleService roleService;
 
     @Autowired
     JwtDecoder jwtDecoder;
 
     @PostMapping("/login")
-    public ResponseEntity authentification(@RequestBody LoginDTO loginDTO){
+    public ResponseEntity<Object> authentification(@RequestBody LoginDTO loginDTO){
 
         if(loginDTO.getUsername()==null || loginDTO.getPassword()==null){
 
            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("requête incorrecte");
-
-        }else{
-            Utilisateur utilisateur=accountService.findUserByUsername(loginDTO.getUsername());
-
-            if(utilisateur==null || !(utilisateur.getPassword().equals(loginDTO.getPassword())) ){
-
-                return ResponseEntity.ok(new ResLoginDTO(false,""));
-            }
-
-            return ResponseEntity.ok(new ResLoginDTO(true, accountService.generateToken( utilisateur )));
-
         }
+
+        Utilisateur utilisateur=accountService.findUserByUsername(loginDTO.getUsername());
+
+        if( utilisateur==null || !(passwordEncoder.matches(loginDTO.getPassword(),utilisateur.getPassword())) ){
+
+            return ResponseEntity.ok(new ResLoginDTO(false,""));
+        }
+
+        return ResponseEntity.ok(new ResLoginDTO(true, accountService.generateToken( utilisateur )));
     }
 
     @GetMapping("/profil")
@@ -60,8 +63,9 @@ public class AcountController {
         return utilisateur;
     }
 
+    @Secured("ADMIN")
     @PostMapping("/createUser")
-    public ResponseEntity<MessageDTO> createUser(@RequestBody UserDTO userDTO){
+    public ResponseEntity<MessageDTO> createUser(@RequestBody UserDTO userDTO) throws IOException, InterruptedException {
 
         if(userDTO.getNom().isEmpty() ||userDTO.getPrenom().isEmpty() ||userDTO.getEmail().isEmpty() ||userDTO.getUsername().isEmpty()){
 
@@ -86,6 +90,12 @@ public class AcountController {
 
         accountService.saveUser(userDTO,role);
 
+        try {
+            HTTPService service = new HTTPService();
+            service.httpRequest(List.of("237" + userDTO.getTelephone()), "Votre compte viens d'être créé sur la plateforme coweb-FR, votre mot de passe est par défaut est: fonds*2024");
+        }catch (ConnectException e){
+            e.printStackTrace();
+        }
         return ResponseEntity.ok(new MessageDTO("succes","utlisateur créé avec succès"));
 
     }
@@ -127,29 +137,87 @@ public class AcountController {
         Jwt jwt=jwtDecoder.decode(token.substring(7));
         Utilisateur utilisateur= accountService.findUserByUsername(jwt.getSubject());
 
-        if( !utilisateur.getPassword().equals(passwordDTO.getPassword()) ){
+        if( !passwordEncoder.matches(passwordDTO.getPassword(),utilisateur.getPassword())  ){
             return ResponseEntity.ok(new MessageDTO("erreur","Mot de passe actuel incorrect, veuillez réessayer avec le bon mot de passe"));
         }
 
-        utilisateur.setPassword(passwordDTO.getNewPassword());
+        utilisateur.setPassword(passwordEncoder.encode(passwordDTO.getNewPassword()));
         accountService.save(utilisateur);
 
         return ResponseEntity.ok(new MessageDTO("succes","Mot de passe modifié avec succès"));
 
     }
 
+    @Secured("ADMIN")
+    @DeleteMapping("/deleteUser/{id}")
+    public ResponseEntity<MessageDTO> deleteUser(@RequestHeader("Authorization") String token, @PathVariable(value = "id") long id ){
+
+        Utilisateur utilisateur= accountService.findUser(id);
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        if(utilisateur==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","Cet utilisateur n'existe pas"));
+        }
+        if(utilisateur.getUsername().equals(jwt.getSubject())){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vos ne pouvez pas supprimer votre propre compte"));
+        }
+        accountService.deleteUser(id);
+        return ResponseEntity.ok(new MessageDTO("succes","Cet utilisateur à bien été supprimé"));
+
+    }
+
+    @Secured("ADMIN")
+    @PutMapping("/resetPassword/{id}")
+    public ResponseEntity<MessageDTO> resetPassword( @PathVariable(value = "id") long id ) throws IOException {
+
+        Utilisateur utilisateur= accountService.findUser(id);
+        if(utilisateur==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","Cet utilisateur n'existe pas"));
+        }
+        utilisateur.setPassword(passwordEncoder.encode(AccountService.defaultPassword));
+        accountService.save(utilisateur);
+
+        try {
+            HTTPService service = new HTTPService();
+            service.httpRequest(List.of("237" + utilisateur.getTelephone()), "Votre mot de passe vient d'être réinitialisé sur la plateforme coweb-FR du Fonds routier");
+        }catch (ConnectException  | InterruptedException e){
+            e.printStackTrace();
+        }
+
+        return ResponseEntity.ok(new MessageDTO("succes","Mot de passe réinitialiser"));
+    }
+
+    @Secured("ADMIN")
+    @PostMapping("/role/saveRole")
+    public ResponseEntity<MessageDTO> saveRole(@RequestBody Role role){
+
+        if(role.getRoleName().isEmpty()){
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+        Role roles=roleService.getRoleByRoleName(role.getRoleName());
+
+        if(roles!=null){
+            return ResponseEntity.ok(new MessageDTO("erreur","Ce role existe déja dans la plateforme, veuillez ajouter un autre role"));
+        }
+        roleService.saveRole(role);
+
+        return ResponseEntity.ok(new MessageDTO("succes","Role enregistré avec succès"));
+    }
+
+    @Secured("ADMIN")
     @GetMapping("/getAllUser")
     public List<Utilisateur> getAllUser( ){
 
         return accountService.getAllUser();
     }
 
+    @Secured("ADMIN")
     @GetMapping("/role/getAllRole")
     public List<Role> getAllRole( ){
 
         return roleService.getAllRole();
     }
 
+    @Secured("ADMIN")
     @DeleteMapping("/role/deleteRole/{id}")
     public ResponseEntity<MessageDTO> deleteRole(@PathVariable(value = "id") long id ){
 
@@ -169,24 +237,9 @@ public class AcountController {
 
     }
 
-    @PostMapping("/role/saveRole")
-    public ResponseEntity<MessageDTO> saveRole(@RequestBody Role role){
-
-        if(role.getRoleName().isEmpty()){
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
-        }
-        Role roles=roleService.getRoleByRoleName(role.getRoleName());
-
-        if(roles!=null){
-            return ResponseEntity.ok(new MessageDTO("erreur","Ce role existe déja dans la plateforme, veuillez ajouter un autre role"));
-        }
-        roleService.saveRole(role);
-        return ResponseEntity.ok(new MessageDTO("succes","Role enregistré avec succès"));
-
-    }
-
+    @Secured("ADMIN")
     @PostMapping("/action/getActionByPeriode")
-    public ResponseEntity getAction(@RequestBody ActionFormDTO filter){
+    public ResponseEntity<Object> getAction(@RequestBody ActionFormDTO filter){
 
         List<String> periode=List.of("TODAY","WEEK","MONTH","PERIODE");
 
@@ -207,26 +260,35 @@ public class AcountController {
 
         if(filter.getPeriode().equals("PERIODE")){
 
-            actions=accountService.findActionByDate(filter.getFirstDate(),filter.getSecondDate());
+            filter.getFirstDate().set(Calendar.HOUR_OF_DAY,0);
+            filter.getSecondDate().set(Calendar.HOUR_OF_DAY,23);
+
+            actions=accountService.findActionByDate(filter.getFirstDate().getTime(),filter.getSecondDate().getTime());
 
         }else if(filter.getPeriode().equals("TODAY")){
 
-            actions=accountService.findActionByDate(new Date(),new Date());
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(Calendar.HOUR_OF_DAY,0);
+            Date date = calendar.getTime();
+
+            actions=accountService.findActionByDate(date,new Date());
 
         }else if(filter.getPeriode().equals("WEEK")){
 
             Calendar calendar = Calendar.getInstance();
             calendar.setFirstDayOfWeek(Calendar.MONDAY);
             calendar.set(Calendar.DAY_OF_WEEK, calendar.getFirstDayOfWeek());
+            calendar.set(Calendar.HOUR_OF_DAY,0);
             Date date = calendar.getTime();
-            actions=accountService.findActionByDate(date,new Date());
 
+            actions=accountService.findActionByDate(date,new Date());
         }else{
             Calendar calendar=Calendar.getInstance();
             calendar.set(Calendar.DAY_OF_MONTH,1);
+            calendar.set(Calendar.HOUR_OF_DAY,0);
             Date date=calendar.getTime();
-            actions=accountService.findActionByDate(date,new Date());
 
+            actions=accountService.findActionByDate(date,new Date());
         }
 
         return ResponseEntity.ok(actions);

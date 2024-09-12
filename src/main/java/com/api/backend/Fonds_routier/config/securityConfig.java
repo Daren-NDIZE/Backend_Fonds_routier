@@ -1,18 +1,14 @@
 package com.api.backend.Fonds_routier.config;
 
-import com.api.backend.Fonds_routier.enums.UserRole;
 import com.api.backend.Fonds_routier.model.Role;
 import com.api.backend.Fonds_routier.model.Utilisateur;
-import com.api.backend.Fonds_routier.repository.UtilisateurRepository;
 import com.api.backend.Fonds_routier.service.AccountService;
 import com.api.backend.Fonds_routier.service.RoleService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -24,6 +20,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -36,7 +33,7 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(securedEnabled = true)
-public class securityConfig  {
+public class securityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -53,6 +50,7 @@ public class securityConfig  {
                 .authorizeHttpRequests(ar->ar.requestMatchers("/login").permitAll())
                 .authorizeHttpRequests(ar->ar.anyRequest().authenticated())
                 .oauth2ResourceServer(oa->oa.jwt(Customizer.withDefaults()))
+                .oauth2ResourceServer(oa->oa.jwt(j->j.jwtAuthenticationConverter(new CustomJwtAuthoritiesConverter() )))
                 .httpBasic(Customizer.withDefaults())
                 .build();
     }
@@ -73,6 +71,7 @@ public class securityConfig  {
         SecretKeySpec secretKeySpec=new SecretKeySpec(secretKey.getBytes(),"RSA");
         return NimbusJwtDecoder.withSecretKey(secretKeySpec).macAlgorithm(MacAlgorithm.HS512).build();
     }
+
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(){
@@ -100,7 +99,7 @@ public class securityConfig  {
                 role.setRoleName("ADMIN");
                 role.setDescription("Administrateur de l'application");
                 roleService.saveRole(role);
-                accountService.save(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",0,"admin@gmail.com",role,"fonds*2024"));
+                accountService.save(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",0,"admin@gmail.com",role, passwordEncoder().encode(AccountService.defaultPassword)));
                 System.out.println("data initialized");
             }
         };

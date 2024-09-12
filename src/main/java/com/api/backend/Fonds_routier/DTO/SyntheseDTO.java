@@ -10,4 +10,5 @@ public class SyntheseDTO {
     public String type;
     public long[] prevision;
     public long[] engagement;
+    public float[] lineaire;
 }

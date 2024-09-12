@@ -6,6 +6,7 @@ import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.*;
+import com.api.backend.Fonds_routier.service.AccountService;
 import com.api.backend.Fonds_routier.service.PayementService;
 import com.api.backend.Fonds_routier.service.ProgrammeService;
 import com.api.backend.Fonds_routier.service.ProjetService;
@@ -15,9 +16,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +36,8 @@ public class ProjetController {
     @Autowired
     ProjetService projetService;
     @Autowired
+    AccountService accountService;
+    @Autowired
     ProgrammeService programmeService;
     @Autowired
     PayementService payementService;
@@ -42,13 +47,16 @@ public class ProjetController {
     @PostMapping("/addProjetToProgrammeMINTP/{id}")
     public ResponseEntity<MessageDTO> addProjetMINTP(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINTP projet){
 
+        List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
+        List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("ACO","DCO");
+        List roles=List.of("CO","DCO");
 
-        if(projet.getProjet()=="" ||projet.getRegion()==null ||projet.getTtc()==0 || projet.getCommune()==""
-             || projet.getDepartement()=="" ||projet.getBudget_n()==0 || projet.getObservation()=="") {
 
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        if(projet.getProjet()=="" ||projet.getRegion()==null ||projet.getTtc()==0 || projet.getCommune()=="" || !categorie.contains(projet.getCategorie())
+            || !typeTravaux.contains(projet.getType_travaux()) || projet.getDepartement()=="" ||projet.getBudget_n()==0 || projet.getObservation()=="") {
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
         }
 
         Programme programme=programmeService.findProgramme(id);
@@ -60,10 +68,6 @@ public class ProjetController {
 
             if(!roles.contains(jwt.getClaim("role"))){
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER ){
-
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
             }
 
         }else{
@@ -82,19 +86,25 @@ public class ProjetController {
         }
 
         projetService.saveProjet(programme,projet);
-        return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succès"));
 
+        if(programme.getType()==ProgrammeType.REPORT){
+            programme.setBudget(programme.getBudget()+projet.getBudget_n());
+            programmeService.saveProgramme(programme);
+        }
+
+        return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succès"));
     }
 
     @PostMapping("/addProjetToProgrammeMINT/{id}")
     public ResponseEntity<MessageDTO> addProjetMINT(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINT projet){
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("ACO","DCO");
+        List roles=List.of("CO","DCO");
+        List<String> gestionnaire=List.of("MINT","MAIRE");
 
-        if(projet.getRegion()==null || projet.getMission()=="" || projet.getObjectif()=="" ||
-                projet.getTtc()==0 ||  projet.getBudget_n()==0 || projet.getOrdonnateur()=="" )
+        if(projet.getRegion()==null || projet.getMission()=="" || projet.getObjectif()=="" ||projet.getDepartement()=="" ||
+            projet.getCommune()=="" ||  projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur( )) )
         {
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement les champs"));
         }
 
         Programme programme=programmeService.findProgramme(id);
@@ -106,10 +116,6 @@ public class ProjetController {
 
             if(!roles.contains(jwt.getClaim("role"))){
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER ){
-
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
             }
 
         }else{
@@ -128,6 +134,11 @@ public class ProjetController {
         }
 
         projetService.saveProjet(programme,projet);
+
+        if(programme.getType()==ProgrammeType.REPORT){
+            programme.setBudget(programme.getBudget()+projet.getBudget_n());
+            programmeService.saveProgramme(programme);
+        }
         return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succes"));
 
     }
@@ -136,11 +147,13 @@ public class ProjetController {
     public ResponseEntity<MessageDTO> addProjetMINDHU(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINHDU projet){
         Jwt jwt=jwtDecoder.decode(token.substring(7));
         List roles=List.of("ACO","DCO");
+        List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
+        List<String> gestionnaire=List.of("MINHDU","MAIRE");
 
-        if(projet.getRegion()==null || projet.getVille()==null || projet.getTroçon()==null ||
-                projet.getTtc()==0 ||  projet.getBudget_n()==0 || projet.getOrdonnateur()==null )
+        if(projet.getRegion()==null || projet.getVille()==null || projet.getTroçon()==null || !typeTravaux.contains(projet.getType_travaux())
+               || projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur() ))
         {
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
         }
 
         Programme programme=programmeService.findProgramme(id);
@@ -152,10 +165,6 @@ public class ProjetController {
 
             if(!roles.contains(jwt.getClaim("role"))){
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER ){
-
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
             }
 
         }else{
@@ -174,18 +183,26 @@ public class ProjetController {
         }
 
         projetService.saveProjet(programme,projet);
-        return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succes"));
 
+        if(programme.getType()==ProgrammeType.REPORT){
+            programme.setBudget(programme.getBudget()+projet.getBudget_n());
+            programmeService.saveProgramme(programme);
+        }
+
+        return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succes"));
     }
 
+    @Secured("DCO")
     @PostMapping("/addProjetToProvisionMINTP/{id}")
     public ResponseEntity<MessageDTO> addProvisionMINTP(@PathVariable(value = "id") long id, @RequestBody ProjetMINTP projet){
 
+        List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
+        List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
 
-        if(projet.getProjet()=="" ||projet.getRegion()==null ||projet.getTtc()==0 || projet.getCommune()==""
-                || projet.getDepartement()=="" ||projet.getBudget_n()==0 || projet.getObservation()=="") {
+        if(projet.getProjet()=="" ||projet.getRegion()==null ||projet.getTtc()==0 || projet.getCommune()=="" || !categorie.contains(projet.getCategorie())
+           || !typeTravaux.contains(projet.getType_travaux()) || projet.getDepartement()=="" ||projet.getBudget_n()==0 || projet.getObservation()=="") {
 
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
         }
 
         Programme programme=programmeService.findProgramme(id);
@@ -203,12 +220,15 @@ public class ProjetController {
 
     }
 
+    @Secured("DCO")
     @PostMapping("/addProjetToProvisionMINHDU/{id}")
     public ResponseEntity<MessageDTO> addProvisionMINHDU(@PathVariable(value = "id") long id, @RequestBody ProjetMINHDU projet){
 
+        List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
+        List<String> gestionnaire=List.of("MINHDU","MAIRE");
 
-        if(projet.getRegion()==null || projet.getVille()==null || projet.getTroçon()==null ||
-                projet.getTtc()==0 ||  projet.getBudget_n()==0 || projet.getOrdonnateur()==null )
+        if(projet.getRegion()==null || projet.getVille()==null || projet.getTroçon()==null || !typeTravaux.contains(projet.getType_travaux())
+              ||  projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur()) )
         {
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
@@ -228,12 +248,14 @@ public class ProjetController {
 
     }
 
+    @Secured("DCO")
     @PostMapping("/addProjetToProvisionMINT/{id}")
     public ResponseEntity<MessageDTO> addProvisionMINT(@PathVariable(value = "id") long id, @RequestBody ProjetMINT projet){
 
+        List<String> gestionnaire=List.of("MINT","MAIRE");
 
-        if(projet.getRegion()==null || projet.getMission()=="" || projet.getObjectif()=="" ||
-                projet.getTtc()==0 ||  projet.getBudget_n()==0 || projet.getOrdonnateur()=="" )
+        if(projet.getRegion()==null || projet.getMission()=="" || projet.getObjectif()=="" ||projet.getTtc()==0 || projet.getDepartement()=="" ||
+            projet.getCommune()=="" || projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur()))
         {
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
@@ -252,16 +274,17 @@ public class ProjetController {
         return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succès"));
 
     }
-
 
     @PutMapping("/updateProjetMINTP/{id}")
     public ResponseEntity<MessageDTO> updateProjetMINTP(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINTP update){
 
+        List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
+        List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("ACO","DCO");
+        List roles=List.of("CO","DCO");
 
-        if(update.getProjet()=="" ||update.getRegion()==null ||update.getTtc()==0 || update.getCommune()==""
-                || update.getDepartement()=="" ||update.getBudget_n()==0 || update.getObservation()=="") {
+        if(update.getProjet()=="" ||update.getRegion()==null ||update.getTtc()==0 || update.getCommune()=="" ||!categorie.contains(update.getCategorie())
+           || !typeTravaux.contains(update.getType_travaux()) || update.getDepartement()=="" ||update.getBudget_n()==0 || update.getObservation()=="") {
 
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
@@ -278,10 +301,9 @@ public class ProjetController {
             if(!roles.contains(jwt.getClaim("role"))){
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
             }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER ){
 
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-            }
+            programme.setBudget(programme.getBudget()+(update.getBudget_n() - projet.getBudget_n()));
+            programmeService.saveProgramme(programme);
 
         }else{
             if(roles.contains(jwt.getClaim("role"))){
@@ -299,6 +321,7 @@ public class ProjetController {
         }
 
         projetService.updateProjet(projet,update);
+
         return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succès"));
 
     }
@@ -307,10 +330,12 @@ public class ProjetController {
     public ResponseEntity<MessageDTO> updateProjetMINDHU(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINHDU update){
 
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("ACO","DCO");
+        List roles=List.of("CO","DCO");
+        List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
+        List<String> gestionnaire=List.of("MINHDU","MAIRE");
 
-        if( update.getRegion()==null || update.getVille()==null || update.getTroçon()==null ||
-                update.getTtc()==0 ||  update.getBudget_n()==0 || update.getOrdonnateur()==null )
+        if( update.getRegion()==null || update.getVille()==null || update.getTroçon()==null || !typeTravaux.contains(update.getType_travaux())
+              ||  update.getTtc()==0 ||  update.getBudget_n()==0 || !gestionnaire.contains(update.getOrdonnateur()) )
         {
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
@@ -327,10 +352,9 @@ public class ProjetController {
             if(!roles.contains(jwt.getClaim("role"))){
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
             }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER ){
 
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-            }
+            programme.setBudget(programme.getBudget()+(update.getBudget_n() - projet.getBudget_n()));
+            programmeService.saveProgramme(programme);
 
         }else{
             if(roles.contains(jwt.getClaim("role"))){
@@ -348,6 +372,7 @@ public class ProjetController {
         }
 
         projetService.updateProjet(projet,update);
+
         return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succès"));
 
     }
@@ -356,10 +381,11 @@ public class ProjetController {
     public ResponseEntity<MessageDTO> updateProjetMINT(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINT update){
 
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("ACO","DCO");
+        List roles=List.of("CO","DCO");
+        List<String> gestionnaire=List.of("MINT","MAIRE");
 
-        if( update.getRegion()==null || update.getMission()==null || update.getObjectif()==null ||
-                update.getTtc()==0 ||  update.getBudget_n()==0 || update.getOrdonnateur()==null )
+        if( update.getRegion()==null || update.getMission()==null || update.getObjectif()==null || update.getDepartement()==""||
+             update.getCommune()=="" ||  update.getTtc()==0 ||  update.getBudget_n()==0 || !gestionnaire.contains(update.getOrdonnateur()) )
         {
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
@@ -376,10 +402,9 @@ public class ProjetController {
             if(!roles.contains(jwt.getClaim("role"))){
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
             }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER ){
 
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-            }
+            programme.setBudget(programme.getBudget()+(update.getBudget_n() - projet.getBudget_n()));
+            programmeService.saveProgramme(programme);
 
         }else{
             if(roles.contains(jwt.getClaim("role"))){
@@ -397,10 +422,12 @@ public class ProjetController {
         }
 
         projetService.updateProjet(projet,update);
+
         return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succes"));
 
     }
 
+    @Secured({"MINTP", "MINHDU","MINT"})
     @DeleteMapping("/deleteProjet/{id}")
     public ResponseEntity<MessageDTO> deleteProjet(@PathVariable(value = "id") long id, @RequestHeader("Authorization") String token){
 
@@ -439,6 +466,7 @@ public class ProjetController {
 
     }
 
+    @Secured("DCO")
     @DeleteMapping("/deleteReportProjet/{id}")
     public ResponseEntity<MessageDTO> deleteReportProjet(@PathVariable(value = "id") long id){
 
@@ -454,21 +482,22 @@ public class ProjetController {
 
             return ResponseEntity.ok(new MessageDTO("erreur","impossible, car ce projet n'est pas dans le programme des reports"));
         }
-        if(programme.getStatut()== ProgrammeStatut.VALIDER ){
 
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-        }
         if(programme.getStatut()== ProgrammeStatut.CLOTURER){
 
             return ResponseEntity.ok(new MessageDTO("erreur","impossible,Ce programme est cloturé"));
         }
 
         projetService.deleteProjet(id);
-        return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
 
+        programme.setBudget(programme.getBudget()-projet.getBudget_n());
+        programmeService.saveProgramme(programme);
+
+        return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
     }
 
-    @DeleteMapping("/deletePrevisionProjet/{id}")
+    @Secured("DCO")
+    @DeleteMapping("/deleteProvisionProjet/{id}")
     public ResponseEntity<MessageDTO> deletePrevisionProjet(@PathVariable(value = "id") long id){
 
         Projet projet=projetService.findProjet(id);
@@ -490,7 +519,7 @@ public class ProjetController {
     }
 
     @GetMapping("/projet/{id}")
-    public ResponseEntity getProjetById(@PathVariable(value = "id") long id){
+    public ResponseEntity<Object> getProjetById(@PathVariable(value = "id") long id){
 
         Projet projet=projetService.findProjet(id);
         if(projet==null){
@@ -549,12 +578,15 @@ public class ProjetController {
         }
 
         projetService.setSuivi(projet, suiviDTO);
+
+        accountService.saveAction(new Action(0,jwt.getSubject(),jwt.getClaim("role"),suiviDTO.getStatut()+": PROJET DE LA REGION DU "+projet.getRegion()+" DU "+programme.getIntitule(),new Date()));
+
         return ResponseEntity.ok(new MessageDTO("succes","Les informations ont été bien enregistrés"));
 
     }
 
     @GetMapping("/projet/getBordereau/{id}")
-    public ResponseEntity getResolution(@PathVariable(value = "id") long id) throws IOException {
+    public ResponseEntity<Object> getResolution(@PathVariable(value = "id") long id) throws IOException {
 
         Projet projet =projetService.findProjet(id);
 
@@ -645,6 +677,31 @@ public class ProjetController {
 
     }
 
+    @PostMapping("/projet/importPayement/{id}")
+    public  ResponseEntity<MessageDTO> importPayement(@PathVariable(value = "id") long id,@RequestParam("file") MultipartFile file){
+
+        MessageDTO messsage;
+        Projet projet =projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+        if(projet.getBordereau()==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car le projet n'est pas validé"));
+        }
+
+        try {
+            messsage=payementService.importpayement(file.getInputStream(),projet);
+
+        } catch (IOException  | IllegalArgumentException   e) {
+            // Log the exception or handle it as needed
+            e.printStackTrace();
+            return ResponseEntity.ok(new MessageDTO("erreur","Erreur d'importation , votre fichier ne respecte pas les contraintes"));
+        }
+        return ResponseEntity.ok(messsage);
+
+    }
+
+    @Secured({"MINTP", "MINHDU","MINT"})
     @PostMapping("/projet/saveSuiviTravaux/{id}")
     public ResponseEntity<MessageDTO> saveSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux suiviTravaux){
 
@@ -658,7 +715,7 @@ public class ProjetController {
         if(projet.getBordereau()==null){
             return ResponseEntity.ok(new MessageDTO("erreur","impossible, car le projet n'est pas validé"));
         }
-        if( suiviTravaux.getDescription()==null || suiviTravaux.getTauxAvancement()<=0 || suiviTravaux.getTauxConsommation()<=0){
+        if( suiviTravaux.getTauxAvancement()<=0 || suiviTravaux.getTauxConsommation()<=0){
 
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
@@ -673,6 +730,7 @@ public class ProjetController {
 
     }
 
+    @Secured({"MINTP", "MINHDU","MINT"})
     @PutMapping("/projet/updateSuiviTravaux/{id}")
     public ResponseEntity<MessageDTO> updateSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux update){
 
@@ -704,6 +762,7 @@ public class ProjetController {
 
     }
 
+    @Secured({"MINTP", "MINHDU","MINT"})
     @DeleteMapping("/projet/deleteSuiviTravaux/{id}")
     public ResponseEntity<MessageDTO> deleteSuiviTravaux(@PathVariable(value = "id") long id){
 

@@ -19,7 +19,7 @@ public interface ProgrammeRepository extends JpaRepository<Programme,Long> {
 
     List<Programme> findByStatut(ProgrammeStatut status);
 
-    List<Programme> findByOrdonnateurAndAnnee(Ordonnateur ordonnateur,int annee);
+    List<Programme> findByOrdonnateurAndTypeAndAnnee(Ordonnateur ordonnateur,ProgrammeType type,int annee);
 
     List<Programme> findAllByStatutIn(List<ProgrammeStatut> status);
 

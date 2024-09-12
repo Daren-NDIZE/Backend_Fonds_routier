@@ -16,7 +16,6 @@ import java.util.List;
 public class Utilisateur {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @JsonIgnore
     private long id;
     @NotNull
     private String nom;
