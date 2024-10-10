@@ -571,19 +571,22 @@ public class ProgrammeService {
         Workbook workbook = WorkbookFactory.create(inputStream);
         Sheet sheet = workbook.getSheetAt(0);
         Sheet secondSheet = workbook.getSheetAt(1);
+        Sheet lastSheet = workbook.getSheetAt(2);
+
 
         FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
 
         for (Row row : sheet) {
-            if (row.getRowNum() == 0) {
+            if (row.getRowNum() <= 3) {
                 continue; // Skip the header row
             }
 
             ProjetMINTP projetMINTP = new ProjetMINTP();
             projetMINTP.setFinancement("NORMAL");
+            projetMINTP.setCategorie("PROJET A GESTION CENTRALE");
             projetMINTP.setProgramme(programme);
 
-            for (int i = 1; i <= 14; i++) {
+            for (int i = 1; i <= 13; i++) {
                 Cell cell = CellUtil.getCell(row, i);
                 if (cell != null) {
                     switch (i) {
@@ -600,22 +603,15 @@ public class ProgrammeService {
                                 return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la première feuille");
                             }
                             break;
-                        case 2:
-                            if (cell.getCellType() == CellType.STRING && categorie.contains(cell.getStringCellValue())) {
-                                projetMINTP.setCategorie(cell.getStringCellValue());
 
-                            }else {
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la première feuille");
-                            }
-                            break;
-                        case 3:
+                        case 2:
                             if (cell.getCellType() == CellType.STRING && travaux.contains(cell.getStringCellValue())) {
                                 projetMINTP.setType_travaux(cell.getStringCellValue());
                             }else {
                                 return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la première feuille");
                             }
                             break;
-                        case 4:
+                        case 3:
                             if (cell.getCellType() == CellType.STRING ) {
                                 projetMINTP.setProjet(cell.getStringCellValue());
 
@@ -623,25 +619,25 @@ public class ProgrammeService {
                                 return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la première feuille");
                             }
                             break;
-                        case 5:
+                        case 4:
                             if (cell.getCellType() == CellType.STRING) {
 
                                 projetMINTP.setCode_route(cell.getStringCellValue());
                             }
                             break;
-                        case 6:
+                        case 5:
                             if (cell.getCellType() == CellType.NUMERIC) {
 
                                 projetMINTP.setLineaire_route((float) cell.getNumericCellValue());
                             }
                             break;
-                        case 7:
+                        case 6:
                             if (cell.getCellType() == CellType.NUMERIC) {
 
                                 projetMINTP.setLineaire_oa((float) cell.getNumericCellValue());
                             }
                             break;
-                        case 8:
+                        case 7:
                             if (cell.getCellType() == CellType.NUMERIC) {
 
                                 projetMINTP.setTtc((long) cell.getNumericCellValue());
@@ -654,7 +650,7 @@ public class ProgrammeService {
                                 return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la première feuille");
                             }
                             break;
-                        case 9:
+                        case 8:
                             if (cell.getCellType() == CellType.NUMERIC) {
                                 projetMINTP.setBudget_anterieur((long) cell.getNumericCellValue());
                             }else if(cell.getCellType()== CellType.FORMULA){
@@ -663,7 +659,7 @@ public class ProgrammeService {
                                 projetMINTP.setBudget_anterieur((long) cellValue.getNumberValue());
                             }
                             break;
-                        case 10:
+                        case 9:
                             if (cell.getCellType() == CellType.NUMERIC) {
                                 projetMINTP.setBudget_n((long) cell.getNumericCellValue());
                             }else if(cell.getCellType()== CellType.FORMULA){
@@ -675,7 +671,7 @@ public class ProgrammeService {
                                 return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la première feuille");
                             }
                             break;
-                        case 11:
+                        case 10:
                             if (cell.getCellType() == CellType.NUMERIC) {
 
                                 projetMINTP.setBudget_n1((long) cell.getNumericCellValue());
@@ -685,7 +681,7 @@ public class ProgrammeService {
                                 projetMINTP.setBudget_n1((long) cellValue.getNumberValue());
                             }
                             break;
-                        case 12:
+                        case 11:
                             if (cell.getCellType() == CellType.NUMERIC) {
 
                                 projetMINTP.setBudget_n2((long) cell.getNumericCellValue());
@@ -695,13 +691,13 @@ public class ProgrammeService {
                                 projetMINTP.setBudget_n2((long) cellValue.getNumberValue());
                             }
                             break;
-                        case 13:
+                        case 12:
                             if (cell.getCellType() == CellType.STRING) {
 
                                 projetMINTP.setPrestataire(cell.getStringCellValue());
                             }
                             break;
-                        case 14:
+                        case 13:
                             if (cell.getCellType() == CellType.STRING) {
 
                                 projetMINTP.setObservation(cell.getStringCellValue());
@@ -718,7 +714,144 @@ public class ProgrammeService {
         }
 
         for (Row row : secondSheet) {
-            if (row.getRowNum() == 0) {
+            if (row.getRowNum() <= 3) {
+                continue; // Skip the header row
+            }
+
+            ProjetMINTP projetMINTP = new ProjetMINTP();
+            projetMINTP.setFinancement("NORMAL");
+            projetMINTP.setCategorie("PROJET A GESTION REGIONALE");
+            projetMINTP.setProgramme(programme);
+
+            for (int i = 1; i <= 13; i++) {
+                Cell cell = CellUtil.getCell(row, i);
+                if (cell != null) {
+                    switch (i) {
+                        case 1:
+                            if (cell.getCellType() == CellType.STRING) {
+                                try {
+                                    String region = cell.getStringCellValue().replace("-", "_");
+                                    projetMINTP.setRegion(Region.valueOf(region));
+                                }
+                                catch(IllegalArgumentException e){
+                                    return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                }
+                            }else{
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                            }
+                            break;
+
+                        case 2:
+                            if (cell.getCellType() == CellType.STRING && travaux.contains(cell.getStringCellValue())) {
+                                projetMINTP.setType_travaux(cell.getStringCellValue());
+                            }else {
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                            }
+                            break;
+                        case 3:
+                            if (cell.getCellType() == CellType.STRING ) {
+                                projetMINTP.setProjet(cell.getStringCellValue());
+
+                            }else{
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                            }
+                            break;
+                        case 4:
+                            if (cell.getCellType() == CellType.STRING) {
+
+                                projetMINTP.setCode_route(cell.getStringCellValue());
+                            }
+                            break;
+                        case 5:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+
+                                projetMINTP.setLineaire_route((float) cell.getNumericCellValue());
+                            }
+                            break;
+                        case 6:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+
+                                projetMINTP.setLineaire_oa((float) cell.getNumericCellValue());
+                            }
+                            break;
+                        case 7:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+
+                                projetMINTP.setTtc((long) cell.getNumericCellValue());
+                            }else if(cell.getCellType()== CellType.FORMULA){
+
+                                CellValue cellValue = evaluator.evaluate(cell);
+                                projetMINTP.setTtc((long) cellValue.getNumberValue());
+                            }
+                            else {
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                            }
+                            break;
+                        case 8:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINTP.setBudget_anterieur((long) cell.getNumericCellValue());
+                            }else if(cell.getCellType()== CellType.FORMULA){
+
+                                CellValue cellValue = evaluator.evaluate(cell);
+                                projetMINTP.setBudget_anterieur((long) cellValue.getNumberValue());
+                            }
+                            break;
+                        case 9:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+                                projetMINTP.setBudget_n((long) cell.getNumericCellValue());
+                            }else if(cell.getCellType()== CellType.FORMULA){
+
+                                CellValue cellValue = evaluator.evaluate(cell);
+                                projetMINTP.setBudget_n((long) cellValue.getNumberValue());
+                            }
+                            else {
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                            }
+                            break;
+                        case 10:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+
+                                projetMINTP.setBudget_n1((long) cell.getNumericCellValue());
+                            }else if(cell.getCellType()== CellType.FORMULA){
+
+                                CellValue cellValue = evaluator.evaluate(cell);
+                                projetMINTP.setBudget_n1((long) cellValue.getNumberValue());
+                            }
+                            break;
+                        case 11:
+                            if (cell.getCellType() == CellType.NUMERIC) {
+
+                                projetMINTP.setBudget_n2((long) cell.getNumericCellValue());
+                            }else if(cell.getCellType()== CellType.FORMULA){
+
+                                CellValue cellValue = evaluator.evaluate(cell);
+                                projetMINTP.setBudget_n2((long) cellValue.getNumberValue());
+                            }
+                            break;
+                        case 12:
+                            if (cell.getCellType() == CellType.STRING) {
+
+                                projetMINTP.setPrestataire(cell.getStringCellValue());
+                            }
+                            break;
+                        case 13:
+                            if (cell.getCellType() == CellType.STRING) {
+
+                                projetMINTP.setObservation(cell.getStringCellValue());
+                            }
+                            break;
+                        default:
+                            // Handle unknown columns or ignore them
+                            break;
+                    }
+                }
+            }
+
+            list.add(projetMINTP);
+        }
+
+        for (Row row : lastSheet) {
+            if (row.getRowNum() <= 3) {
                 continue; // Skip the header row
             }
 
@@ -738,31 +871,31 @@ public class ProgrammeService {
                                     projetMINTP.setRegion(Region.valueOf(region));
                                 }
                                 catch(IllegalArgumentException e){
-                                    return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                    return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                                 }
                             }else{
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 2:
                             if (cell.getCellType() == CellType.STRING) {
                                 projetMINTP.setDepartement(cell.getStringCellValue());
                             }else{
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 3:
                             if (cell.getCellType() == CellType.STRING) {
                                 projetMINTP.setCommune(cell.getStringCellValue());
                             }else{
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 4:
                             if (cell.getCellType() == CellType.STRING && travaux.contains(cell.getStringCellValue())) {
                                 projetMINTP.setType_travaux(cell.getStringCellValue());
                             }else {
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 5:
@@ -770,7 +903,7 @@ public class ProgrammeService {
                                 projetMINTP.setProjet(cell.getStringCellValue());
 
                             }else{
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 6:
@@ -800,7 +933,7 @@ public class ProgrammeService {
                                 projetMINTP.setTtc((long) cellValue.getNumberValue());
                             }
                             else {
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 10:
@@ -822,7 +955,7 @@ public class ProgrammeService {
                                 projetMINTP.setBudget_n((long) cellValue.getNumberValue());
                             }
                             else {
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
+                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la troisième feuille");
                             }
                             break;
                         case 12:

@@ -472,8 +472,12 @@ public class ProgrammeController {
                     message="Le "+programme.getIntitule()+" vient d'être renvoyé pour correction";
                 }
 
-                HTTPService service=new HTTPService();
-                service.httpRequest(List.of("237"+utilisateur.getTelephone()),message);
+                try{
+                    HTTPService service=new HTTPService();
+                    service.httpRequest(List.of("237"+utilisateur.getTelephone()),message);
+                }catch (ConnectException e){
+                    e.printStackTrace();
+                }
                 break;
             }
         }
