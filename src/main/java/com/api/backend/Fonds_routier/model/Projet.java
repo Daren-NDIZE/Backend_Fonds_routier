@@ -42,6 +42,9 @@ public class Projet implements Cloneable {
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "projet",cascade = CascadeType.REMOVE)
     private List<SuiviTravaux> suiviTravaux;
 
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "projet",cascade = CascadeType.REMOVE)
+    private List<Passation> passation;
+
     public Object clone() throws CloneNotSupportedException{
         return super.clone();
     }

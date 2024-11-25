@@ -11,4 +11,5 @@ import java.util.List;
 public interface ActionRepository extends JpaRepository<Action,Long> {
 
     List<Action> findByDateBetween(Date firstDate, Date secondDate);
+
 }

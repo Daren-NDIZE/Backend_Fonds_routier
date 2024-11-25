@@ -10,8 +10,10 @@ import com.api.backend.Fonds_routier.enums.Region;
 import com.api.backend.Fonds_routier.model.*;
 import com.api.backend.Fonds_routier.repository.*;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -33,6 +35,8 @@ public class ProgrammeService {
     PayementRepository payementRepository;
     @Autowired
     SuiviRepository suiviRepository;
+    @Autowired
+    PassationRepository passationRepository;
 
 
     public void saveProgramme(Programme programme){
@@ -165,7 +169,7 @@ public class ProgrammeService {
                 List<Projet> ouvrage= programme.getProjetList().stream().filter(p->p.getFinancement().equals("NORMAL")).collect(Collectors.toList());
 
 
-                synthese.prevision[0]=synthese.prevision[0]+totalBudget(centrale);
+                synthese.prevision[0]=synthese.prevision[0]+totalBudget(centrale)+ programme.getPrevision();
                 synthese.engagement[0]=synthese.engagement[0]+totalEngagement(centrale);
 
                 synthese.lineaire[0]=synthese.lineaire[0]+totalLineaire(bitume,"ROUTE");
@@ -268,6 +272,10 @@ public class ProgrammeService {
         long total = 0;
 
         for(Projet projet: projets){
+
+            if(projet.getFinancement().equals("RESERVE")){
+                continue;
+            }
             total=total + projet.getBudget_n();
         }
 
@@ -287,9 +295,27 @@ public class ProgrammeService {
         return total;
     }
 
+    public long totalReserve(List<Projet> projets){
+        long total = 0;
+
+        for(Projet projet: projets){
+
+            if(projet.getFinancement().equals("NORMAL")){
+                continue;
+            }
+            total=total + projet.getBudget_n();
+        }
+
+        return total;
+    }
+
     public float totalLineaire(List<Projet> projets,String type){
 
         float total = 0;
+
+        if(projets.isEmpty()){
+            return total;
+        }
 
         if(projets.get(0) instanceof ProjetMINTP){
 
@@ -320,6 +346,10 @@ public class ProgrammeService {
         float total = 0;
 
         projets= projets.stream().filter(p->p.getSuivi()!=null && p.getSuivi().getEngagement()!=0).collect(Collectors.toList());
+
+        if(projets.isEmpty()){
+            return total;
+        }
 
         if(projets.get(0) instanceof ProjetMINTP){
 
@@ -387,6 +417,15 @@ public class ProgrammeService {
                 suiviTravaux.setProjet(cloneProjet);
                 suiviTravauxRepository.save(suiviTravaux);
             }
+
+            for(Passation passation: projet.getPassation()){
+
+                passation= (Passation) passation.clone();
+                passation.setId(0);
+                passation.setProjet(cloneProjet);
+                passationRepository.save(passation);
+            }
+
             for(Payement payement : projet.getPayement()){
                 payement= (Payement) payement.clone();
                 payement.setId(0);
@@ -411,7 +450,7 @@ public class ProgrammeService {
 
 
         for (Row row : sheet) {
-            if (row.getRowNum() == 0) {
+            if (row.getRowNum() <= 3) {
                 continue; // Skip the header row
             }
 
@@ -419,10 +458,28 @@ public class ProgrammeService {
             projetMINHDU.setFinancement("NORMAL");
             projetMINHDU.setProgramme(programme);
 
+            Cell cel = CellUtil.getCell(row, 0);
+
+            if(isCellMerge(sheet,cel)){
+
+                if (cel.getCellType() == CellType.STRING ) {
+                    if(cel.getStringCellValue().equals("TOTAL")){
+                      break;
+                    }else{
+                        return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel));
+                    }
+                }else {
+                    return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel));
+                }
+
+            }
+
             for (int i = 1; i <= 13; i++) {
                 Cell cell = CellUtil.getCell(row, i);
+
                 if (cell != null) {
                     switch (i) {
+
                         case 1:
                             if (cell.getCellType() == CellType.STRING) {
                                 try {
@@ -586,6 +643,22 @@ public class ProgrammeService {
             projetMINTP.setCategorie("PROJET A GESTION CENTRALE");
             projetMINTP.setProgramme(programme);
 
+            Cell cel = CellUtil.getCell(row, 0);
+
+            if(isCellMerge(sheet,cel)){
+
+                if (cel.getCellType() == CellType.STRING ) {
+                    if(cel.getStringCellValue().equals("TOTAL")){
+                        break;
+                    }else{
+                        return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la première feuille");
+                    }
+                }else {
+                    return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la première feuille");
+                }
+
+            }
+
             for (int i = 1; i <= 13; i++) {
                 Cell cell = CellUtil.getCell(row, i);
                 if (cell != null) {
@@ -723,6 +796,22 @@ public class ProgrammeService {
             projetMINTP.setCategorie("PROJET A GESTION REGIONALE");
             projetMINTP.setProgramme(programme);
 
+            Cell cel = CellUtil.getCell(row, 0);
+
+            if(isCellMerge(secondSheet,cel)){
+
+                if (cel.getCellType() == CellType.STRING ) {
+                    if(cel.getStringCellValue().equals("TOTAL")){
+                        break;
+                    }else{
+                        return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la deuxième feuille");
+                    }
+                }else {
+                    return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la deuxième feuille");
+                }
+
+            }
+
             for (int i = 1; i <= 13; i++) {
                 Cell cell = CellUtil.getCell(row, i);
                 if (cell != null) {
@@ -859,6 +948,22 @@ public class ProgrammeService {
             projetMINTP.setFinancement("NORMAL");
             projetMINTP.setCategorie("PROJET A GESTION COMMUNALE");
             projetMINTP.setProgramme(programme);
+
+            Cell cel = CellUtil.getCell(row, 0);
+
+            if(isCellMerge(secondSheet,cel)){
+
+                if (cel.getCellType() == CellType.STRING ) {
+                    if(cel.getStringCellValue().equals("TOTAL")){
+                        break;
+                    }else{
+                        return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la troisième feuille");
+                    }
+                }else {
+                    return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la troisième feuille");
+                }
+
+            }
 
             for (int i = 1; i <= 15; i++) {
                 Cell cell = CellUtil.getCell(row, i);
@@ -1017,7 +1122,7 @@ public class ProgrammeService {
         FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
 
         for (Row row : sheet) {
-            if (row.getRowNum() == 0) {
+            if (row.getRowNum() <= 3) {
                 continue; // Skip the header row
             }
 
@@ -1025,6 +1130,22 @@ public class ProgrammeService {
             projetMINT.setFinancement("NORMAL");
             projetMINT.setOrdonnateur("MINT");
             projetMINT.setProgramme(programme);
+
+            Cell cel = CellUtil.getCell(row, 0);
+
+            if(isCellMerge(sheet,cel)){
+
+                if (cel.getCellType() == CellType.STRING ) {
+                    if(cel.getStringCellValue().equals("TOTAL")){
+                        break;
+                    }else{
+                        return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la première feuille");
+                    }
+                }else {
+                    return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la première feuille");
+                }
+
+            }
 
             for (int i = 1; i <= 11; i++) {
                 Cell cell = CellUtil.getCell(row, i);
@@ -1140,7 +1261,7 @@ public class ProgrammeService {
         }
 
         for (Row row : sencondSheet) {
-            if (row.getRowNum() == 0) {
+            if (row.getRowNum() <= 3) {
                 continue; // Skip the header row
             }
 
@@ -1148,6 +1269,22 @@ public class ProgrammeService {
             projetMINT.setFinancement("NORMAL");
             projetMINT.setOrdonnateur("MAIRE");
             projetMINT.setProgramme(programme);
+
+            Cell cel = CellUtil.getCell(row, 0);
+
+            if(isCellMerge(sencondSheet,cel)){
+
+                if (cel.getCellType() == CellType.STRING ) {
+                    if(cel.getStringCellValue().equals("TOTAL")){
+                        break;
+                    }else{
+                        return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la deuxième feuille");
+                    }
+                }else {
+                    return new MessageDTO("erreur","erreur d'importation à la cellule "+getCellLetter(cel)+" de la deuxième feuille");
+                }
+
+            }
 
             for (int i = 1; i <= 13; i++) {
                 Cell cell = CellUtil.getCell(row, i);
@@ -1195,8 +1332,6 @@ public class ProgrammeService {
 
                                 projetMINT.setObjectif(cell.getStringCellValue());
 
-                            }else{
-                                return new MessageDTO("erreur","Erreur d'importation à la cellule "+getCellLetter(cell)+" de la deuxième feuille");
                             }
                             break;
                         case 6:
@@ -1301,6 +1436,17 @@ public class ProgrammeService {
         }
 
         return columnLetter.toString()+String.valueOf(indexRow);
+    }
+
+    public boolean isCellMerge(Sheet sheet, Cell cell){
+
+        for(CellRangeAddress mergedERegion: sheet.getMergedRegions()){
+            if(mergedERegion.isInRange(cell)){
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

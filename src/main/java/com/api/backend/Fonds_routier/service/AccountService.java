@@ -5,8 +5,10 @@ import com.api.backend.Fonds_routier.enums.UserRole;
 import com.api.backend.Fonds_routier.model.Action;
 import com.api.backend.Fonds_routier.model.Role;
 import com.api.backend.Fonds_routier.model.Utilisateur;
+import com.api.backend.Fonds_routier.model.VerificationCode;
 import com.api.backend.Fonds_routier.repository.ActionRepository;
 import com.api.backend.Fonds_routier.repository.UtilisateurRepository;
+import com.api.backend.Fonds_routier.repository.VerificationCodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -18,8 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class AccountService {
@@ -32,6 +33,8 @@ public class AccountService {
     private UtilisateurRepository utilisateurRepository;
     @Autowired
     private ActionRepository actionRepository;
+    @Autowired
+    private VerificationCodeRepository verificationCodeRepository;
 
     public static final String defaultPassword="fonds*2024";
 
@@ -66,9 +69,15 @@ public class AccountService {
         utilisateur.setPassword(passwordEncoder.encode(defaultPassword));
         utilisateur.setRole(role);
         utilisateur.setEmail(userDTO.getEmail());
+        utilisateur.setAdministration(userDTO.getAdministration());
         utilisateur.setTelephone(userDTO.getTelephone());
 
         utilisateurRepository.save(utilisateur);
+    }
+
+    public List<Utilisateur> getUserByAdministration(String administration){
+
+        return utilisateurRepository.findByAdministration(administration);
     }
 
     public void save(Utilisateur utilisateur){
@@ -99,6 +108,7 @@ public class AccountService {
                 .expiresAt(instant.plus(10, ChronoUnit.HOURS))
                 .subject(utilisateur.getUsername())
                 .claim("role", utilisateur.getRole().getRoleName())
+                .claim("structure", utilisateur.getAdministration())
                 .build();
         JwtEncoderParameters jwtEncoderParameters=JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS512).build(),
@@ -117,4 +127,24 @@ public class AccountService {
        return actionRepository.findByDateBetween(firstDate,secondDate);
     }
 
+    public int generetecode(){
+
+        Random random = new Random();
+        int code = 100000 + random.nextInt(900000);
+
+        return code;
+    }
+
+    public void saveVerification(VerificationCode verificationCode){
+
+        Date dateActuelle = new Date();
+
+        // Utiliser Calendar pour ajouter des minutes
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(dateActuelle);
+        calendar.add(Calendar.MINUTE, 3);
+        verificationCode.setExpiredAt(calendar.getTime());
+
+        verificationCodeRepository.save(verificationCode);
+    }
 }

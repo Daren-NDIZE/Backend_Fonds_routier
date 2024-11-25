@@ -20,4 +20,7 @@ public class Role {
     private String description;
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "role") @JsonIgnore
     private List<Utilisateur> utilisateur;
+    @ManyToMany (fetch = FetchType.LAZY, mappedBy = "roles")
+    List <Permission> permissions;
+
 }

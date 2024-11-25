@@ -10,6 +10,7 @@ public class UserDTO {
     private String nom;
     private String prenom;
     private String username;
+    private String administration;
     private long telephone;
     private String email;
     private String roleName;

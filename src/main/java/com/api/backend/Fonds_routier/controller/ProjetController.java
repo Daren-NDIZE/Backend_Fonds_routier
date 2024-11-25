@@ -6,12 +6,10 @@ import com.api.backend.Fonds_routier.enums.Ordonnateur;
 import com.api.backend.Fonds_routier.enums.ProgrammeStatut;
 import com.api.backend.Fonds_routier.enums.ProgrammeType;
 import com.api.backend.Fonds_routier.model.*;
-import com.api.backend.Fonds_routier.service.AccountService;
-import com.api.backend.Fonds_routier.service.PayementService;
-import com.api.backend.Fonds_routier.service.ProgrammeService;
-import com.api.backend.Fonds_routier.service.ProjetService;
+import com.api.backend.Fonds_routier.service.*;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -42,7 +40,22 @@ public class ProjetController {
     @Autowired
     PayementService payementService;
     @Autowired
+    RoleService roleService;
+    @Autowired
     JwtDecoder jwtDecoder;
+
+    ClassPathResource resource=new ClassPathResource("static/");
+    String chemin=resource.getURI().getPath().substring(1);
+
+    public ProjetController() throws IOException {
+    }
+
+
+    //Gestion de la programmation
+
+
+
+    // Saisie des projets
 
     @PostMapping("/addProjetToProgrammeMINTP/{id}")
     public ResponseEntity<MessageDTO> addProjetMINTP(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINTP projet){
@@ -50,34 +63,40 @@ public class ProjetController {
         List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
         List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("CO","DCO");
-
-
-        if(projet.getProjet()=="" ||projet.getRegion()==null ||projet.getTtc()==0 || projet.getCommune()=="" || !categorie.contains(projet.getCategorie())
-            || !typeTravaux.contains(projet.getType_travaux()) || projet.getDepartement()=="" ||projet.getBudget_n()==0 || projet.getObservation()=="") {
-
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
-        }
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
 
         Programme programme=programmeService.findProgramme(id);
+
         if(programme==null){
             return ResponseEntity.ok(new MessageDTO("erreur","programme inexistant"));
         }
 
         if(programme.getType()==ProgrammeType.REPORT){
 
-            if(!roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
             }
 
         }else{
-            if(roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
             }
+
+            if(!programme.getOrdonnateur().equals( Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+                return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+            }
+
             if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
 
                 return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
             }
+        }
+
+
+        if(projet.getProjet()=="" ||projet.getRegion()==null ||projet.getTtc()==0 || projet.getCommune()=="" || !categorie.contains(projet.getCategorie())
+            || !typeTravaux.contains(projet.getType_travaux()) || projet.getDepartement()=="" ||projet.getBudget_n()==0 || projet.getObservation()=="") {
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
         }
 
         if(programme.getStatut()==ProgrammeStatut.CLOTURER){
@@ -97,15 +116,10 @@ public class ProjetController {
 
     @PostMapping("/addProjetToProgrammeMINT/{id}")
     public ResponseEntity<MessageDTO> addProjetMINT(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINT projet){
-        Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("CO","DCO");
-        List<String> gestionnaire=List.of("MINT","MAIRE");
 
-        if(projet.getRegion()==null || projet.getMission()=="" || projet.getObjectif()=="" ||projet.getDepartement()=="" ||
-            projet.getCommune()=="" ||  projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur( )) )
-        {
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement les champs"));
-        }
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        List<String> gestionnaire=List.of("MINT","MAIRE");
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
 
         Programme programme=programmeService.findProgramme(id);
         if(programme==null){
@@ -114,18 +128,29 @@ public class ProjetController {
 
         if(programme.getType()==ProgrammeType.REPORT){
 
-            if(!roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
             }
 
         }else{
-            if(roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
             }
+
+            if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+                return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+            }
+
             if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
 
                 return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
             }
+        }
+
+        if(projet.getRegion()==null || projet.getMission()=="" || projet.getObjectif()=="" ||projet.getDepartement()=="" ||
+            projet.getCommune()=="" ||  projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur( )) )
+        {
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement les champs"));
         }
 
         if(programme.getStatut()==ProgrammeStatut.CLOTURER){
@@ -146,15 +171,9 @@ public class ProjetController {
     @PostMapping("/addProjetToProgrammeMINHDU/{id}")
     public ResponseEntity<MessageDTO> addProjetMINDHU(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINHDU projet){
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("ACO","DCO");
         List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
         List<String> gestionnaire=List.of("MINHDU","MAIRE");
-
-        if(projet.getRegion()==null || projet.getVille()==null || projet.getTroçon()==null || !typeTravaux.contains(projet.getType_travaux())
-               || projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur() ))
-        {
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
-        }
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
 
         Programme programme=programmeService.findProgramme(id);
         if(programme==null){
@@ -163,19 +182,31 @@ public class ProjetController {
 
         if(programme.getType()==ProgrammeType.REPORT){
 
-            if(!roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
             }
 
         }else{
-            if(roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
             }
+
+            if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+                return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+            }
+
             if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
 
                 return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
             }
         }
+
+        if(projet.getRegion()==null || projet.getVille()==null || projet.getTroçon()==null || !typeTravaux.contains(projet.getType_travaux())
+               || projet.getTtc()==0 ||  projet.getBudget_n()==0 || !gestionnaire.contains(projet.getOrdonnateur() ))
+        {
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
+        }
+
 
         if(programme.getStatut()==ProgrammeStatut.CLOTURER){
 
@@ -192,9 +223,240 @@ public class ProjetController {
         return ResponseEntity.ok(new MessageDTO("succes","projet enregistré avec succes"));
     }
 
+    //Update des projet
+
+    @PutMapping("/updateProjetMINTP/{id}")
+    public ResponseEntity<MessageDTO> updateProjetMINTP(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINTP update){
+
+        List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
+        List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        Projet projet=projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+
+        Programme programme=projet.getProgramme();
+
+        if(programme.getType()==ProgrammeType.REPORT){
+
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+            }
+
+        }else{
+
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+            }
+
+            if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+                return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+            }
+
+            if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
+
+                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
+            }
+        }
+
+        if(update.getProjet()=="" ||update.getRegion()==null ||update.getTtc()==0 || update.getCommune()=="" ||!categorie.contains(update.getCategorie())
+                || !typeTravaux.contains(update.getType_travaux()) || update.getDepartement()=="" ||update.getBudget_n()==0 || update.getObservation()=="") {
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+
+        if(programme.getStatut()==ProgrammeStatut.CLOTURER){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible,le programme est cloturé"));
+        }
+
+        projetService.updateProjet(projet,update);
+
+        if(programme.getType()==ProgrammeType.REPORT) {
+            programme.setBudget(programme.getBudget() + (update.getBudget_n() - projet.getBudget_n()));
+            programmeService.saveProgramme(programme);
+        }
+
+        return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succès"));
+
+    }
+
+    @PutMapping("/updateProjetMINHDU/{id}")
+    public ResponseEntity<MessageDTO> updateProjetMINDHU(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINHDU update){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
+        List<String> gestionnaire=List.of("MINHDU","MAIRE");
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        Projet projet=projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+
+        Programme programme=projet.getProgramme();
+
+        if(programme.getType()==ProgrammeType.REPORT){
+
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+            }
+
+        }else{
+
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+            }
+
+            if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+                return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+            }
+
+            if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
+                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
+            }
+        }
+
+        if( update.getRegion()==null || update.getVille()==null || update.getTroçon()==null || !typeTravaux.contains(update.getType_travaux())
+                ||  update.getTtc()==0 ||  update.getBudget_n()==0 || !gestionnaire.contains(update.getOrdonnateur()) )
+        {
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+
+        if(programme.getStatut()==ProgrammeStatut.CLOTURER){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible,le programme est cloturé"));
+        }
+
+        projetService.updateProjet(projet,update);
+
+        if(programme.getType()==ProgrammeType.REPORT) {
+            programme.setBudget(programme.getBudget() + (update.getBudget_n() - projet.getBudget_n()));
+            programmeService.saveProgramme(programme);
+        }
+
+        return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succès"));
+    }
+
+    @PutMapping("/updateProjetMINT/{id}")
+    public ResponseEntity<MessageDTO> updateProjetMINT(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINT update){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        List<String> gestionnaire=List.of("MINT","MAIRE");
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        Projet projet=projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+
+        Programme programme=projet.getProgramme();
+
+        if(programme.getType()==ProgrammeType.REPORT){
+
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+            }
+
+        }else{
+
+            if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+                return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+            }
+
+            if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+                return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+            }
+
+            if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
+
+                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
+            }
+        }
+
+        if( update.getRegion()==null || update.getMission()==null || update.getObjectif()==null || update.getDepartement()==""||
+                update.getCommune()=="" ||  update.getTtc()==0 ||  update.getBudget_n()==0 || !gestionnaire.contains(update.getOrdonnateur()) )
+        {
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+
+        if(programme.getStatut()==ProgrammeStatut.CLOTURER){
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible,le programme est cloturé"));
+        }
+
+        projetService.updateProjet(projet,update);
+
+        if(programme.getType()==ProgrammeType.REPORT) {
+            programme.setBudget(programme.getBudget() + (update.getBudget_n() - projet.getBudget_n()));
+            programmeService.saveProgramme(programme);
+        }
+
+        return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succes"));
+    }
+
+    // Delete des projets
+
+    @DeleteMapping("/deleteProjet/{id}")
+    public ResponseEntity<MessageDTO> deleteProjet(@PathVariable(value = "id") long id, @RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Projet projet=projetService.findProjet(id);
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROGRAMMATION")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
+
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+
+        Programme programme=projet.getProgramme();
+
+        if(!programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+        }
+
+        if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
+        }
+        if(programme.getStatut()== ProgrammeStatut.CLOTURER){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible,Ce programme est cloturé"));
+        }
+        if(programme.getType()==ProgrammeType.AJUSTER){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible de supprimer un projet dans le programme ajusté"));
+        }
+
+        if(projet.getSuivi()!=null){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible de supprimer ce projet car il a été engagé"));
+        }
+
+        projetService.deleteProjet(id);
+        return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
+    }
+
+
+
+
+    // Gestion de la provision de reserve
+
     @Secured("DCO")
     @PostMapping("/addProjetToProvisionMINTP/{id}")
-    public ResponseEntity<MessageDTO> addProvisionMINTP(@PathVariable(value = "id") long id, @RequestBody ProjetMINTP projet){
+    public ResponseEntity<MessageDTO> addProvisionMINTP(@PathVariable(value = "id") long id, @RequestBody ProjetMINTP projet ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROVISION DE RESERVE")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
         List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
@@ -222,7 +484,14 @@ public class ProjetController {
 
     @Secured("DCO")
     @PostMapping("/addProjetToProvisionMINHDU/{id}")
-    public ResponseEntity<MessageDTO> addProvisionMINHDU(@PathVariable(value = "id") long id, @RequestBody ProjetMINHDU projet){
+    public ResponseEntity<MessageDTO> addProvisionMINHDU(@PathVariable(value = "id") long id, @RequestBody ProjetMINHDU projet ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROVISION DE RESERVE")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
         List<String> gestionnaire=List.of("MINHDU","MAIRE");
@@ -250,7 +519,14 @@ public class ProjetController {
 
     @Secured("DCO")
     @PostMapping("/addProjetToProvisionMINT/{id}")
-    public ResponseEntity<MessageDTO> addProvisionMINT(@PathVariable(value = "id") long id, @RequestBody ProjetMINT projet){
+    public ResponseEntity<MessageDTO> addProvisionMINT(@PathVariable(value = "id") long id, @RequestBody ProjetMINT projet ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROVISION DE RESERVE")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         List<String> gestionnaire=List.of("MINT","MAIRE");
 
@@ -275,200 +551,50 @@ public class ProjetController {
 
     }
 
-    @PutMapping("/updateProjetMINTP/{id}")
-    public ResponseEntity<MessageDTO> updateProjetMINTP(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINTP update){
-
-        List<String> categorie=List.of("PROJET A GESTION CENTRALE","PROJET A GESTION REGIONALE","PROJET A GESTION COMMUNALE");
-        List<String> typeTravaux=List.of("ROUTE EN TERRE","ROUTE BITUMÉE","OUVRAGE D'ART");
-        Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("CO","DCO");
-
-        if(update.getProjet()=="" ||update.getRegion()==null ||update.getTtc()==0 || update.getCommune()=="" ||!categorie.contains(update.getCategorie())
-           || !typeTravaux.contains(update.getType_travaux()) || update.getDepartement()=="" ||update.getBudget_n()==0 || update.getObservation()=="") {
-
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
-        }
-
-        Projet projet=projetService.findProjet(id);
-        if(projet==null){
-            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
-        }
-
-        Programme programme=projet.getProgramme();
-
-        if(programme.getType()==ProgrammeType.REPORT){
-
-            if(!roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-
-            programme.setBudget(programme.getBudget()+(update.getBudget_n() - projet.getBudget_n()));
-            programmeService.saveProgramme(programme);
-
-        }else{
-            if(roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
-
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-            }
-        }
-
-        if(programme.getStatut()==ProgrammeStatut.CLOTURER){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible,le programme est cloturé"));
-        }
-
-        projetService.updateProjet(projet,update);
-
-        return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succès"));
-
-    }
-
-    @PutMapping("/updateProjetMINHDU/{id}")
-    public ResponseEntity<MessageDTO> updateProjetMINDHU(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINHDU update){
+    @Secured("DCO")
+    @DeleteMapping("/deleteProvisionProjet/{id}")
+    public ResponseEntity<MessageDTO> deletePrevisionProjet(@PathVariable(value = "id") long id ,@RequestHeader("Authorization") String token){
 
         Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("CO","DCO");
-        List<String> typeTravaux=List.of("ENTRETIEN DES VOIRIES URBAINES","ETUDES ET CONTROLES TECHNIQUES");
-        List<String> gestionnaire=List.of("MINHDU","MAIRE");
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
 
-        if( update.getRegion()==null || update.getVille()==null || update.getTroçon()==null || !typeTravaux.contains(update.getType_travaux())
-              ||  update.getTtc()==0 ||  update.getBudget_n()==0 || !gestionnaire.contains(update.getOrdonnateur()) )
-        {
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        if(!roleService.containsPermission(role.getPermissions(),"GESTION DE LA PROVISION DE RESERVE")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
         }
 
-        Projet projet=projetService.findProjet(id);
-        if(projet==null){
-            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
-        }
-
-        Programme programme=projet.getProgramme();
-
-        if(programme.getType()==ProgrammeType.REPORT){
-
-            if(!roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-
-            programme.setBudget(programme.getBudget()+(update.getBudget_n() - projet.getBudget_n()));
-            programmeService.saveProgramme(programme);
-
-        }else{
-            if(roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
-
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-            }
-        }
-
-        if(programme.getStatut()==ProgrammeStatut.CLOTURER){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible,le programme est cloturé"));
-        }
-
-        projetService.updateProjet(projet,update);
-
-        return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succès"));
-
-    }
-
-    @PutMapping("/updateProjetMINT/{id}")
-    public ResponseEntity<MessageDTO> updateProjetMINT(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @RequestBody ProjetMINT update){
-
-        Jwt jwt=jwtDecoder.decode(token.substring(7));
-        List roles=List.of("CO","DCO");
-        List<String> gestionnaire=List.of("MINT","MAIRE");
-
-        if( update.getRegion()==null || update.getMission()==null || update.getObjectif()==null || update.getDepartement()==""||
-             update.getCommune()=="" ||  update.getTtc()==0 ||  update.getBudget_n()==0 || !gestionnaire.contains(update.getOrdonnateur()) )
-        {
-            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
-        }
-
-        Projet projet=projetService.findProjet(id);
-        if(projet==null){
-            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
-        }
-
-        Programme programme=projet.getProgramme();
-
-        if(programme.getType()==ProgrammeType.REPORT){
-
-            if(!roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-
-            programme.setBudget(programme.getBudget()+(update.getBudget_n() - projet.getBudget_n()));
-            programmeService.saveProgramme(programme);
-
-        }else{
-            if(roles.contains(jwt.getClaim("role"))){
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
-            }
-            if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
-
-                return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-            }
-        }
-
-        if(programme.getStatut()==ProgrammeStatut.CLOTURER){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible,le programme est cloturé"));
-        }
-
-        projetService.updateProjet(projet,update);
-
-        return ResponseEntity.ok(new MessageDTO("succes","projet modifié avec succes"));
-
-    }
-
-    @Secured({"MINTP", "MINHDU","MINT"})
-    @DeleteMapping("/deleteProjet/{id}")
-    public ResponseEntity<MessageDTO> deleteProjet(@PathVariable(value = "id") long id, @RequestHeader("Authorization") String token){
-
-        Jwt jwt=jwtDecoder.decode(token.substring(7));
         Projet projet=projetService.findProjet(id);
 
         if(projet==null){
             return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
         }
+        if(projet.getFinancement().equals("NORMAL")){
 
-        Programme programme=projet.getProgramme();
-
-        if( !(programme.getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("role")))) ){
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new MessageDTO("erreur","accès refusé"));
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car ce projet n'est pas dans la provision"));
         }
-        if(programme.getStatut()== ProgrammeStatut.VALIDER || programme.getStatut()== ProgrammeStatut.SOUMIS){
+        if(projet.getProgramme().getStatut()==ProgrammeStatut.CLOTURER){
 
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible, programme en cours de traitement"));
-        }
-        if(programme.getStatut()== ProgrammeStatut.CLOTURER){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible,Ce programme est cloturé"));
-        }
-        if(programme.getType()==ProgrammeType.AJUSTER){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible de supprimer un projet dans le programme ajusté"));
-        }
-
-        if(projet.getSuivi()!=null){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible de supprimer ce projet car il a été engagé"));
+            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car ce programme est  cloturé"));
         }
 
         projetService.deleteProjet(id);
         return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
-
     }
+
+
+
+
+    // Gestion du report des crédits
 
     @Secured("DCO")
     @DeleteMapping("/deleteReportProjet/{id}")
-    public ResponseEntity<MessageDTO> deleteReportProjet(@PathVariable(value = "id") long id){
+    public ResponseEntity<MessageDTO> deleteReportProjet(@PathVariable(value = "id") long id ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"GESTION DES PROGRAMMES REPORTS")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         Projet projet=projetService.findProjet(id);
 
@@ -496,27 +622,9 @@ public class ProjetController {
         return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
     }
 
-    @Secured("DCO")
-    @DeleteMapping("/deleteProvisionProjet/{id}")
-    public ResponseEntity<MessageDTO> deletePrevisionProjet(@PathVariable(value = "id") long id){
 
-        Projet projet=projetService.findProjet(id);
 
-        if(projet==null){
-            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
-        }
-        if(projet.getFinancement().equals("NORMAL")){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car ce projet n'est pas dans la provision"));
-        }
-        if(projet.getProgramme().getStatut()==ProgrammeStatut.CLOTURER){
-
-            return ResponseEntity.ok(new MessageDTO("erreur","impossible, car ce programme est  cloturé"));
-        }
-
-        projetService.deleteProjet(id);
-        return ResponseEntity.ok(new MessageDTO("succes","projet supprimé avec succès"));
-    }
+    //////////////////////////////////////////////////////
 
     @GetMapping("/projet/{id}")
     public ResponseEntity<Object> getProjetById(@PathVariable(value = "id") long id){
@@ -528,6 +636,36 @@ public class ProjetController {
 
         return ResponseEntity.ok(projet);
     }
+
+    @GetMapping("/projet/getBordereau/{id}")
+    public ResponseEntity<Object> getResolution(@PathVariable(value = "id") long id) throws IOException {
+
+        Projet projet =projetService.findProjet(id);
+
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+        if(projet.getBordereau()==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","aucun fichier disponible"));
+        }
+
+        Path path=Paths.get(chemin+projet.getBordereau());
+
+        if(!Files.exists(path)){
+            return ResponseEntity.ok(new MessageDTO("erreur","fichier introuvable"));
+        }
+        byte[] pdf=Files.readAllBytes(path);
+
+        HttpHeaders header=new HttpHeaders();
+        header.setContentType(MediaType.parseMediaType("application/pdf"));
+        header.setContentLength(pdf.length);
+
+        return new ResponseEntity(pdf,header, HttpStatus.OK);
+    }
+
+
+
+    // Traitement des projets
 
     @PostMapping("/suiviProjet/{id}")
     public ResponseEntity<MessageDTO> suivProjet(@PathVariable(value = "id") long id,@RequestHeader("Authorization") String token, @ModelAttribute SuiviDTO suiviDTO) throws IOException, CloneNotSupportedException {
@@ -577,42 +715,39 @@ public class ProjetController {
             projet.setBordereau("bordereau/"+programme.getOrdonnateur()+"/marché_"+projet.getId()+".pdf");
         }
 
+        if(suiviDTO.getStatut().equals("Transmis pour visa") && projet.getBudget_n() < suiviDTO.getEngagement() ){
+
+            long total=programmeService.totalReserve(programme.getProjetList())+suiviDTO.getEngagement()-projet.getBudget_n();
+
+            if(programme.getPrevision() < total){
+
+                return ResponseEntity.ok(new MessageDTO("erreur","Impossible, car votre provision de réserve est insuffisante"));
+            }
+        }
+
         projetService.setSuivi(projet, suiviDTO);
 
-        accountService.saveAction(new Action(0,jwt.getSubject(),jwt.getClaim("role"),suiviDTO.getStatut()+": PROJET DE LA REGION DU "+projet.getRegion()+" DU "+programme.getIntitule(),new Date()));
+        accountService.saveAction(new Action(0,jwt.getSubject(),jwt.getClaim("role"),suiviDTO.getStatut()+": PROJET DE LA REGION DU/DE "+projet.getRegion()+" DU "+programme.getIntitule(),new Date()));
 
         return ResponseEntity.ok(new MessageDTO("succes","Les informations ont été bien enregistrés"));
 
     }
 
-    @GetMapping("/projet/getBordereau/{id}")
-    public ResponseEntity<Object> getResolution(@PathVariable(value = "id") long id) throws IOException {
 
-        Projet projet =projetService.findProjet(id);
 
-        if(projet==null){
-            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
-        }
-        if(projet.getBordereau()==null){
-            return ResponseEntity.ok(new MessageDTO("erreur","aucun fichier disponible"));
-        }
 
-        Path path=Paths.get("C:/Users/Daren NDIZE/Desktop/FR/Back end/Backend_Fonds_routier/src/main/resources/static/"+projet.getBordereau());
+    // Gestion des paiements
 
-        if(!Files.exists(path)){
-            return ResponseEntity.ok(new MessageDTO("erreur","fichier introuvable"));
-        }
-        byte[] pdf=Files.readAllBytes(path);
-
-        HttpHeaders header=new HttpHeaders();
-        header.setContentType(MediaType.parseMediaType("application/pdf"));
-        header.setContentLength(pdf.length);
-
-        return new ResponseEntity(pdf,header, HttpStatus.OK);
-    }
-
+    @Secured({"DAF", "COMPTABLE FR"})
     @PostMapping("/projet/savePayement/{id}")
-    public  ResponseEntity<MessageDTO> savePayement(@PathVariable(value = "id") long id, @RequestBody Payement payement){
+    public  ResponseEntity<MessageDTO> savePayement(@PathVariable(value = "id") long id, @RequestBody Payement payement ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SAISIE DES PAIEMENTS")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         Projet projet =projetService.findProjet(id);
         if(projet==null){
@@ -631,8 +766,16 @@ public class ProjetController {
 
     }
 
+    @Secured({"DAF", "COMPTABLE FR"})
     @PutMapping("/projet/updatePayement/{id}")
-    public  ResponseEntity<MessageDTO> updatePayement(@PathVariable(value = "id") long id, @RequestBody Payement update){
+    public  ResponseEntity<MessageDTO> updatePayement(@PathVariable(value = "id") long id, @RequestBody Payement update ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SAISIE DES PAIEMENTS")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         Payement payement= payementService.findPayement(id);
 
@@ -658,8 +801,16 @@ public class ProjetController {
 
     }
 
+    @Secured({"DAF", "COMPTABLE FR"})
     @DeleteMapping("/projet/deletePayement/{id}")
-    public  ResponseEntity<MessageDTO> deletePayement(@PathVariable(value = "id") long id){
+    public  ResponseEntity<MessageDTO> deletePayement(@PathVariable(value = "id") long id ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SAISIE DES PAIEMENTS")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         Payement payement= payementService.findPayement(id);
         if(payement==null){
@@ -677,8 +828,16 @@ public class ProjetController {
 
     }
 
+    @Secured({"DAF", "COMPTABLE FR"})
     @PostMapping("/projet/importPayement/{id}")
-    public  ResponseEntity<MessageDTO> importPayement(@PathVariable(value = "id") long id,@RequestParam("file") MultipartFile file){
+    public  ResponseEntity<MessageDTO> importPayement(@PathVariable(value = "id") long id,@RequestParam("file") MultipartFile file ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SAISIE DES PAIEMENTS")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         MessageDTO messsage;
         Projet projet =projetService.findProjet(id);
@@ -701,17 +860,29 @@ public class ProjetController {
 
     }
 
-    @Secured({"MINTP", "MINHDU","MINT"})
+
+
+    // Gestion du suivi des travaux
+
     @PostMapping("/projet/saveSuiviTravaux/{id}")
-    public ResponseEntity<MessageDTO> saveSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux suiviTravaux){
+    public ResponseEntity<MessageDTO> saveSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux suiviTravaux ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SUIVI DE L'EXECUTION DES TRAVAUX")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         Projet projet =projetService.findProjet(id);
         if(projet==null){
             return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
         }
-        if(projet.getProgramme().getStatut()!=ProgrammeStatut.VALIDER){
-            return ResponseEntity.ok(new MessageDTO("erreur","Votre programme n'a pas été validé"));
+
+        if(!projet.getProgramme().getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")))){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
         }
+
         if(projet.getBordereau()==null){
             return ResponseEntity.ok(new MessageDTO("erreur","impossible, car le projet n'est pas validé"));
         }
@@ -730,17 +901,25 @@ public class ProjetController {
 
     }
 
-    @Secured({"MINTP", "MINHDU","MINT"})
     @PutMapping("/projet/updateSuiviTravaux/{id}")
-    public ResponseEntity<MessageDTO> updateSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux update){
+    public ResponseEntity<MessageDTO> updateSuiviTravaux(@PathVariable(value = "id") long id, @RequestBody SuiviTravaux update ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SUIVI DE L'EXECUTION DES TRAVAUX")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         SuiviTravaux suiviTravaux=projetService.findSuiviTravaux(id);
         if(suiviTravaux==null){
             return ResponseEntity.ok(new MessageDTO("erreur","suivi  inexistant"));
         }
-        if(suiviTravaux.getProjet().getProgramme().getStatut()!=ProgrammeStatut.VALIDER){
-            return ResponseEntity.ok(new MessageDTO("erreur","Votre programme n'a pas été validé"));
+
+        if(!suiviTravaux.getProjet().getProgramme().getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")))){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
         }
+
         if( update.getDescription()==null || update.getTauxAvancement()<=0 || update.getTauxConsommation()<=0){
 
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
@@ -762,9 +941,15 @@ public class ProjetController {
 
     }
 
-    @Secured({"MINTP", "MINHDU","MINT"})
     @DeleteMapping("/projet/deleteSuiviTravaux/{id}")
-    public ResponseEntity<MessageDTO> deleteSuiviTravaux(@PathVariable(value = "id") long id){
+    public ResponseEntity<MessageDTO> deleteSuiviTravaux(@PathVariable(value = "id") long id ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SUIVI DE L'EXECUTION DES TRAVAUX")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
 
         SuiviTravaux suiviTravaux =projetService.findSuiviTravaux(id);
 
@@ -772,8 +957,8 @@ public class ProjetController {
             return ResponseEntity.ok(new MessageDTO("erreur","suivi  inexistant"));
         }
 
-        if(suiviTravaux.getProjet().getProgramme().getStatut()!=ProgrammeStatut.VALIDER){
-            return ResponseEntity.ok(new MessageDTO("erreur","Votre programme n'a pas été validé"));
+        if(!suiviTravaux.getProjet().getProgramme().getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")))){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
         }
 
         long j= (new Date().getTime()-suiviTravaux.getDate().getTime())/86400000;
@@ -787,5 +972,109 @@ public class ProjetController {
         return ResponseEntity.ok(new MessageDTO("succes","suivi supprimé avec succès"));
     }
 
+
+
+    //Gestion de la passation
+
+    @PostMapping("/projet/savePassation/{id}")
+    public ResponseEntity<MessageDTO> savePassation(@PathVariable(value = "id") long id, @RequestBody Passation passation ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SUIVI DE LA PASSATION")){
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
+
+        Projet projet =projetService.findProjet(id);
+        if(projet==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","projet inexistant"));
+        }
+
+        if(!projet.getProgramme().getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+        }
+
+        if(projet.getProgramme().getStatut()!=ProgrammeStatut.VALIDER){
+            return ResponseEntity.ok(new MessageDTO("erreur","Votre programme n'a pas été validé"));
+        }
+
+        if( passation.getContractualisation()=="" || passation.getDateOs()==null || passation.getNumeroMarche()==""){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+
+        projetService.savePassation(projet,passation);
+
+        return ResponseEntity.ok(new MessageDTO("succes","suivi de passation enregistré avec succès"));
+    }
+
+    @PutMapping("/projet/updatePassation/{id}")
+    public ResponseEntity<MessageDTO> updatePassation(@PathVariable(value = "id") long id, @RequestBody Passation update ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SUIVI DE LA PASSATION")){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
+
+        Passation passation=projetService.findPassation(id);
+        if(passation==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","suivi  inexistant"));
+        }
+
+        if(!passation.getProjet().getProgramme().getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")) )){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+        }
+
+        if( update.getContractualisation().isEmpty() || update.getDateOs()==null || update.getNumeroMarche().isEmpty()){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+
+        long j= (new Date().getTime()- passation.getDate().getTime())/86400000;
+
+        if(j > 5){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible de modifier cet élément car il a été enregistré il y'a plus d'une semaine"));
+        }
+
+        projetService.updatePassation(passation,update);
+
+        return ResponseEntity.ok(new MessageDTO("succes","suivi de passation modifié avec succès"));
+    }
+
+    @DeleteMapping("/projet/deletePassation/{id}")
+    public ResponseEntity<MessageDTO> deletePassation(@PathVariable(value = "id") long id ,@RequestHeader("Authorization") String token){
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        Role role= roleService.getRoleByRoleName(jwt.getClaim("role"));
+
+        if(!roleService.containsPermission(role.getPermissions(),"SUIVI DE LA PASSATION")){
+
+            return ResponseEntity.ok(new MessageDTO("erreur","Vous n'avez pas accès à cette fonctionnalité"));
+        }
+
+        Passation passation =projetService.findPassation(id);
+
+        if(passation==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","suivi  inexistant"));
+        }
+
+        if(!passation.getProjet().getProgramme().getOrdonnateur().equals(Ordonnateur.valueOf(jwt.getClaim("structure")))){
+            return ResponseEntity.ok(new MessageDTO("erreur","accès refusé"));
+        }
+
+        long j= (new Date().getTime()-passation.getDate().getTime())/86400000;
+
+        if(j > 7){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible de supprimer cet élément car il a été enregistré il y'a plus d'une semaine"));
+        }
+
+        projetService.deletePassation(id);
+
+        return ResponseEntity.ok(new MessageDTO("succes","suppression réussite"));
+    }
 
 }

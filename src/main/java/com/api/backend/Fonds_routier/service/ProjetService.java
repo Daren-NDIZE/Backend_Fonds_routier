@@ -1,10 +1,8 @@
 package com.api.backend.Fonds_routier.service;
 
 import com.api.backend.Fonds_routier.DTO.SuiviDTO;
-import com.api.backend.Fonds_routier.model.Programme;
-import com.api.backend.Fonds_routier.model.Projet;
-import com.api.backend.Fonds_routier.model.Suivi;
-import com.api.backend.Fonds_routier.model.SuiviTravaux;
+import com.api.backend.Fonds_routier.model.*;
+import com.api.backend.Fonds_routier.repository.PassationRepository;
 import com.api.backend.Fonds_routier.repository.ProjetRepository;
 import com.api.backend.Fonds_routier.repository.SuiviRepository;
 import com.api.backend.Fonds_routier.repository.SuiviTravauxRepository;
@@ -23,9 +21,10 @@ public class ProjetService {
     ProjetRepository projetRepository;
     @Autowired
     SuiviRepository suiviRepository;
-
     @Autowired
     SuiviTravauxRepository suiviTravauxRepository;
+    @Autowired
+    PassationRepository passationRepository;
 
     public void saveProjet(Programme programme,Projet projet){
 
@@ -119,6 +118,14 @@ public class ProjetService {
         suiviTravauxRepository.save(suiviTravaux);
     }
 
+    public void savePassation(Projet projet, Passation passation){
+
+        passation.setProjet(projet);
+        passation.setDate(new Date());
+        passationRepository.save(passation);
+
+    }
+
     public SuiviTravaux findSuiviTravaux(long id){
 
         return suiviTravauxRepository.findById(id).orElse(null);
@@ -129,6 +136,7 @@ public class ProjetService {
         suiviTravaux.setDescription(update.getDescription());
         suiviTravaux.setTauxAvancement(update.getTauxAvancement());
         suiviTravaux.setTauxConsommation(update.getTauxConsommation());
+        suiviTravaux.setProposition(update.getProposition());
 
         suiviTravauxRepository.save(suiviTravaux);
     }
@@ -136,5 +144,24 @@ public class ProjetService {
     public void deleteSuiviTravaux(long id){
 
         suiviTravauxRepository.deleteById(id);
+    }
+
+    public Passation findPassation(long id){
+
+        return passationRepository.findById(id).orElse(null);
+    }
+
+    public void updatePassation(Passation passation ,Passation update){
+
+        passation.setContractualisation(update.getContractualisation());
+        passation.setNumeroMarche(update.getNumeroMarche());
+        passation.setDateOs(update.getDateOs());
+
+        passationRepository.save(passation);
+    }
+
+    public void deletePassation(long id){
+
+        passationRepository.deleteById(id);
     }
 }

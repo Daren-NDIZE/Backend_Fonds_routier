@@ -20,13 +20,13 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Date;
 import java.util.List;
 
 
@@ -47,7 +47,7 @@ public class securityConfig {
                 .csrf(csrf->csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(ar->ar.requestMatchers("/login").permitAll())
+                .authorizeHttpRequests(ar->ar.requestMatchers("/login","/verifyCode").permitAll())
                 .authorizeHttpRequests(ar->ar.anyRequest().authenticated())
                 .oauth2ResourceServer(oa->oa.jwt(Customizer.withDefaults()))
                 .oauth2ResourceServer(oa->oa.jwt(j->j.jwtAuthenticationConverter(new CustomJwtAuthoritiesConverter() )))
@@ -86,6 +86,7 @@ public class securityConfig {
         return source;
     }
 
+
     @Bean
     CommandLineRunner initDatabase(AccountService accountService, RoleService roleService) {
 
@@ -99,8 +100,12 @@ public class securityConfig {
                 role.setRoleName("ADMIN");
                 role.setDescription("Administrateur de l'application");
                 roleService.saveRole(role);
-                accountService.save(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",0,"admin@gmail.com",role, passwordEncoder().encode(AccountService.defaultPassword)));
+
+                roleService.initPermission();
+
+                accountService.save(new Utilisateur(0,"fondsroutier ","FR","fondsroutier",694392214,"admin@gmail.com","FR",role, passwordEncoder().encode(AccountService.defaultPassword),new Date() ,null));
                 System.out.println("data initialized");
+
             }
         };
     }

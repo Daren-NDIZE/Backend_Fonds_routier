@@ -18,10 +18,6 @@ public class SuiviTravaux implements Cloneable {
     @Temporal(TemporalType.DATE)
     private Date date;
     @NotNull
-    private Date dateOs;
-    @NotNull
-    private String numeroMarche;
-    @NotNull
     private double tauxAvancement;
     @NotNull
     private double tauxConsommation;
@@ -29,8 +25,6 @@ public class SuiviTravaux implements Cloneable {
     private String description;
     @Column(columnDefinition = "TEXT")
     private String proposition;
-    @NotNull
-    private String contractualisation;
     @ManyToOne @JsonIgnore
     private Projet projet;
 

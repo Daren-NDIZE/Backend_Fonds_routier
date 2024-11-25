@@ -1,9 +1,7 @@
 package com.api.backend.Fonds_routier.controller;
 
 import com.api.backend.Fonds_routier.DTO.*;
-import com.api.backend.Fonds_routier.model.Action;
-import com.api.backend.Fonds_routier.model.Role;
-import com.api.backend.Fonds_routier.model.Utilisateur;
+import com.api.backend.Fonds_routier.model.*;
 import com.api.backend.Fonds_routier.service.AccountService;
 import com.api.backend.Fonds_routier.service.HTTPService;
 import com.api.backend.Fonds_routier.service.RoleService;
@@ -11,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -22,6 +19,7 @@ import java.net.ConnectException;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class AcountController {
@@ -37,7 +35,7 @@ public class AcountController {
     JwtDecoder jwtDecoder;
 
     @PostMapping("/login")
-    public ResponseEntity<Object> authentification(@RequestBody LoginDTO loginDTO){
+    public ResponseEntity<Object> authentification(@RequestBody LoginDTO loginDTO) throws IOException {
 
         if(loginDTO.getUsername()==null || loginDTO.getPassword()==null){
 
@@ -51,7 +49,93 @@ public class AcountController {
             return ResponseEntity.ok(new ResLoginDTO(false,""));
         }
 
+        long j=5;
+
+        if(utilisateur.getConnexionDate()!=null){
+
+            j= (new Date().getTime()-utilisateur.getConnexionDate().getTime())/86400000;
+        }
+
+        if(j>=4){
+
+            int code= accountService.generetecode();
+
+            try {
+                HTTPService service = new HTTPService();
+                service.httpRequest(List.of("237" + utilisateur.getTelephone()), "Votre code de vérification est: "+code);
+
+            }catch (ConnectException  | InterruptedException e){
+                e.printStackTrace();
+            }
+
+            VerificationCode verificationCode= new VerificationCode();
+            verificationCode.setCode(code);
+            verificationCode.setUtilisateur(utilisateur);
+
+            accountService.saveVerification(verificationCode);
+
+            return ResponseEntity.status(300).body(Map.of("username",utilisateur.getUsername()));
+        }
+
+        utilisateur.setConnexionDate(new Date());
+        accountService.save(utilisateur);
+
         return ResponseEntity.ok(new ResLoginDTO(true, accountService.generateToken( utilisateur )));
+    }
+
+    @PostMapping("/verifyCode")
+    public ResponseEntity<Object> verifiyCode(@RequestBody CodeDTO codeDTO) throws IOException {
+
+        if(codeDTO.getUsername()==null || codeDTO.getUsername().isEmpty() ){
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("requête incorrecte");
+        }
+
+        if(String.valueOf(codeDTO.getCode()).length() != 6){
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("requête incorrecte");
+        }
+
+        Utilisateur utilisateur=accountService.findUserByUsername(codeDTO.getUsername());
+
+        if( utilisateur==null){
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("requête incorrecte");
+        }
+
+        if(utilisateur.getVerificationCode().isEmpty()){
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Accès refusé");
+        }
+
+        int lastIndex=utilisateur.getVerificationCode().size()-1;
+
+        VerificationCode verificationCode=utilisateur.getVerificationCode().get(lastIndex);
+
+        long seconde= (new Date().getTime()-verificationCode.getExpiredAt().getTime())/1000;
+
+        if(seconde > 1200){
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Accès refusé");
+        }
+
+        if(verificationCode.getCode()==codeDTO.getCode()){
+
+            if(seconde < 180){
+
+                utilisateur.setConnexionDate(new Date());
+                accountService.save(utilisateur);
+
+                return ResponseEntity.ok(new ResLoginDTO(true, accountService.generateToken( utilisateur )));
+            }else {
+                return ResponseEntity.ok(new ResLoginDTO(false, "Votre code de vérification a expiré, veuillez retourner à la page de connexion" ));
+            }
+
+        }else{
+
+            return ResponseEntity.ok(new ResLoginDTO(false, "Votre code de vérification est incorrect"));
+        }
+
     }
 
     @GetMapping("/profil")
@@ -65,10 +149,16 @@ public class AcountController {
 
     @Secured("ADMIN")
     @PostMapping("/createUser")
-    public ResponseEntity<MessageDTO> createUser(@RequestBody UserDTO userDTO) throws IOException, InterruptedException {
+    public ResponseEntity<MessageDTO> createUser(@RequestBody UserDTO userDTO, @RequestHeader("Authorization") String token) throws IOException, InterruptedException {
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
+        List<String> list=List.of("FR","MINTP","MINHDU","MINT");
 
         if(userDTO.getNom().isEmpty() ||userDTO.getPrenom().isEmpty() ||userDTO.getEmail().isEmpty() ||userDTO.getUsername().isEmpty()){
 
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
+        }
+        if(!list.contains(userDTO.getAdministration())){
             return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir tous les champs"));
         }
 
@@ -89,6 +179,7 @@ public class AcountController {
         }
 
         accountService.saveUser(userDTO,role);
+        accountService.saveAction(new Action(0,jwt.getSubject(),jwt.getClaim("role"),"CREATION D'UN NOUVEL UTILISATEUR: "+userDTO.getNom()+" "+userDTO.getPrenom(),new Date()));
 
         try {
             HTTPService service = new HTTPService();
@@ -154,6 +245,7 @@ public class AcountController {
 
         Utilisateur utilisateur= accountService.findUser(id);
         Jwt jwt=jwtDecoder.decode(token.substring(7));
+
         if(utilisateur==null){
             return ResponseEntity.ok(new MessageDTO("erreur","Cet utilisateur n'existe pas"));
         }
@@ -161,20 +253,29 @@ public class AcountController {
             return ResponseEntity.ok(new MessageDTO("erreur","Vos ne pouvez pas supprimer votre propre compte"));
         }
         accountService.deleteUser(id);
+
+        accountService.saveAction(new Action(0,jwt.getSubject(),jwt.getClaim("role"),"SUPPRESSION DE L'UTILISATEUR "+utilisateur.getNom()+" "+utilisateur.getPrenom(),new Date()));
+
         return ResponseEntity.ok(new MessageDTO("succes","Cet utilisateur à bien été supprimé"));
 
     }
 
     @Secured("ADMIN")
     @PutMapping("/resetPassword/{id}")
-    public ResponseEntity<MessageDTO> resetPassword( @PathVariable(value = "id") long id ) throws IOException {
+    public ResponseEntity<MessageDTO> resetPassword( @RequestHeader("Authorization") String token, @PathVariable(value = "id") long id ) throws IOException {
+
+        Jwt jwt=jwtDecoder.decode(token.substring(7));
 
         Utilisateur utilisateur= accountService.findUser(id);
+
         if(utilisateur==null){
             return ResponseEntity.ok(new MessageDTO("erreur","Cet utilisateur n'existe pas"));
         }
         utilisateur.setPassword(passwordEncoder.encode(AccountService.defaultPassword));
+
         accountService.save(utilisateur);
+        accountService.saveAction(new Action(0,jwt.getSubject(),jwt.getClaim("role"),"RÉINITIALISATION DU MOT DE PASSE DE L'UTILISATEUR "+utilisateur.getNom()+" "+utilisateur.getPrenom(),new Date()));
+
 
         try {
             HTTPService service = new HTTPService();
@@ -294,5 +395,64 @@ public class AcountController {
         return ResponseEntity.ok(actions);
 
     }
+
+    @Secured("ADMIN")
+    @GetMapping("/getAllPermission")
+    public List<Permission> getAllPermission( ){
+
+        return roleService.getAllPermission();
+    }
+
+
+    @Secured("ADMIN")
+    @PutMapping("/givePermission")
+    public ResponseEntity<MessageDTO> givePermission(@RequestBody GivePerDTO per ){
+
+        if(per.getRole()==0 || per.getPermission()==0){
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
+        }
+
+        Role role=roleService.findRole(per.getRole());
+        Permission permission=roleService.findPermission(per.getPermission());
+
+        if(role==null || permission==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","veuillez remplir correctement tous les champs"));
+        }
+
+        if(role.getPermissions().contains(permission)){
+            return ResponseEntity.ok(new MessageDTO("erreur","Ce role possède déja cette permission"));
+        }
+
+        role.getPermissions().add(permission);
+        permission.getRoles().add(role);
+        roleService.saveRole(role);
+        return ResponseEntity.ok(new MessageDTO("succes","Nouvelle permission ajoutée avec succès"));
+    }
+
+    @Secured("ADMIN")
+    @DeleteMapping("/removePermission/{rId}/{perId}")
+    public ResponseEntity<MessageDTO> removePermission(@PathVariable(value = "rId") long rId,@PathVariable(value = "perId") long perId){
+
+        if(rId==0 || perId==0){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible"));
+        }
+
+        Role role=roleService.findRole(rId);
+        Permission permission=roleService.findPermission(perId);
+
+        if(role==null || permission==null){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible"));
+        }
+
+        if(!role.getPermissions().contains(permission)){
+            return ResponseEntity.ok(new MessageDTO("erreur","Impossible"));
+        }
+
+        role.getPermissions().remove(permission);
+        permission.getRoles().remove(role);
+        roleService.saveRole(role);
+        return ResponseEntity.ok(new MessageDTO("succes","Permission retiré avec succès"));
+    }
+
 
 }

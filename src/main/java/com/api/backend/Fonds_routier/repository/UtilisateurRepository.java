@@ -15,6 +15,8 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur,Long> {
 
     Utilisateur findByRole(Role role);
 
+    List<Utilisateur> findByAdministration(String administration);
+
     List<Utilisateur> findByIdIsNot(long id);
 
 }
